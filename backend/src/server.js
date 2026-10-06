@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { app } from './app.js';
+import * as appModule from './app.js';
 import { env } from './config/env.js';
 import { connectDatabase, disconnectDatabase } from './config/database.js';
 import { connectRedis, disconnectRedis, redis } from './config/redis.js';
@@ -12,6 +12,10 @@ import { ChatMessage } from './models/ChatMessage.js';
 import { StudyNote } from './models/StudyNote.js';
 import { Flashcard } from './models/Flashcard.js';
 import { StudyRequest } from './models/StudyRequest.js';
+
+// Accept either export style so the server can start with named or default app exports.
+const app = appModule.app ?? appModule.default;
+if (!app) throw new TypeError("./app.js must export the Express application as 'app' or as its default export");
 
 let httpServer;
 let shuttingDown = false;
