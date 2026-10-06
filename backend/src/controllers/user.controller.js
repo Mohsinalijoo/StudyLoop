@@ -5,6 +5,8 @@ import { normalizeSubject, parseLimit, parseSubjects, requireAvailability, requi
 import { publicUser } from '../utils/serializers.js';
 import { isUserOnline, onlineStatuses, onlineUserIds } from '../services/presence.service.js';
 import { cancelMatch } from '../services/matchmaking.service.js';
+import { permanentlyDeleteAccount } from '../services/account-deletion.service.js';
+import { env } from '../config/env.js';
 
 export const getMe = asyncHandler(async (req, res) => {
   res.json({ data: { user: publicUser(req.user, await isUserOnline(req.auth.userId)) } });
@@ -26,6 +28,17 @@ export const updateMe = asyncHandler(async (req, res) => {
   const user = await User.findByIdAndUpdate(req.auth.userId, { $set: update }, { new: true, runValidators: true });
   if (update.subjectKeys || update.availability) await cancelMatch(req.auth.userId);
   res.json({ data: { user: publicUser(user, await isUserOnline(req.auth.userId)) } });
+});
+
+export const deleteMe = asyncHandler(async (req, res) => {
+  await permanentlyDeleteAccount(req.auth.userId);
+  res.clearCookie('studyloop_refresh', {
+    httpOnly: true,
+    secure: env.cookieSecure,
+    sameSite: env.cookieSameSite,
+    path: '/api/auth'
+  });
+  res.json({ data: { deleted: true } });
 });
 
 export const listUsers = asyncHandler(async (req, res) => {

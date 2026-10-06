@@ -136,7 +136,9 @@
     const availability = student.availability === 'now' ? 'Free now' : student.availability === 'later' ? 'Available later' : 'Flexible schedule';
     const presenceText = student.online ? 'Online now' : 'Offline';
     const bio = student.bio ? `<p class="student-bio">${escapeHTML(student.bio)}</p>` : '';
-    const subject = student.subjects.find((item) => currentUser.subjects.some((mine) => mine.toLocaleLowerCase() === item.toLocaleLowerCase())) || student.subjects[0] || '';
+    const sharedSubject = student.subjects.find((item) => currentUser.subjects.some((mine) => mine.toLocaleLowerCase() === item.toLocaleLowerCase())) || '';
+    const matchAction = sharedSubject ? `data-subject="${escapeHTML(sharedSubject)}"` : 'data-any-field="true"';
+    const matchLabel = sharedSubject ? `Find a 1:1 match in ${escapeHTML(sharedSubject)}` : 'Find a 1:1 match in any field';
     return `
       <article class="student-card">
         <div class="student-card-top">
@@ -149,8 +151,8 @@
         <div class="student-tags">${topics}</div>
         <div class="student-availability"><span class="online-dot ${student.online ? '' : 'is-away'}"></span><span>${availability}</span></div>
         <div class="student-actions">
-          <button class="invite-button" type="button" data-action="match" data-subject="${escapeHTML(subject)}" ${subject ? '' : 'disabled'}>
-            Find a 1:1 match in ${escapeHTML(subject || 'this subject')}
+          <button class="invite-button" type="button" data-action="match" ${matchAction}>
+            ${matchLabel}
           </button>
         </div>
       </article>`;
@@ -169,7 +171,9 @@
       emptyStateTitle.textContent = searchInput.value || subjectFilter.value !== 'all' || availabilityFilter.value !== 'any'
         ? 'No members match those filters'
         : 'No other members yet';
-      emptyStateText.textContent = 'When more members join with a shared study subject, they will appear here. Try different criteria or check back later.';
+      emptyStateText.textContent = subjectFilter.value === 'all'
+        ? 'No other members match those filters yet. Try a different search or check back later.'
+        : 'Try a different study field, availability, or search term, or check back later.';
     }
   }
 
@@ -187,9 +191,8 @@
     try {
       const users = await api.request(`/users?${params}`);
       if (requestNumber !== searchRequestNumber) return;
-      const ownSubjects = new Set((currentUser.subjects || []).map((value) => value.toLocaleLowerCase()));
       students = (Array.isArray(users) ? users : [])
-        .filter((user) => user.id !== currentUser.id && (subject !== 'all' || (user.subjects || []).some((value) => ownSubjects.has(value.toLocaleLowerCase()))))
+        .filter((user) => user.id !== currentUser.id)
         .map((user) => ({
           id: user.id,
           name: user.displayName,
@@ -736,7 +739,8 @@
           setMatchStatus('Your search ended. Start a new match when you are ready.');
           return;
         }
-        setMatchStatus(`Searching for a ${status.subject} study partner · queue position ${status.queuePosition || '…'}`, true);
+        const description = status.anyField ? 'a study partner from any field' : `a study partner studying ${status.subject}`;
+        setMatchStatus(`Searching for ${description} · queue position ${status.queuePosition || '…'}`, true);
       } catch (error) {
         clearMatchPolling();
         reportError(error);
@@ -745,28 +749,31 @@
     }, 5000);
   }
 
-  async function findStudyBuddy(subjectOverride = '') {
+  async function findStudyBuddy(subjectOverride = '', anyFieldOverride = false) {
     if (!realtime.ready) {
       showToast('Realtime is not connected yet. Wait a moment and try again.');
       return;
     }
-    const subject = subjectOverride || (subjectFilter.value !== 'all' ? subjectFilter.value : currentUser.subjects?.[0]);
+    const anyField = anyFieldOverride || (!subjectOverride && subjectFilter.value === 'all');
+    const subject = anyField ? 'Any field' : (subjectOverride || subjectFilter.value);
     if (!subject) {
-      showToast('Add a study subject to your profile before searching.');
+      showToast('Choose a study field or select All fields of study.');
       return;
     }
-    setMatchStatus(`Looking for someone studying ${subject}…`, true);
+    const searchDescription = anyField ? 'a study partner from any field' : `someone studying ${subject}`;
+    setMatchStatus(`Looking for ${searchDescription}…`, true);
     try {
-      const result = await api.request('/matchmaking', {
-        method: 'POST',
-        body: { subject, availability: currentUser.availability || 'flexible' }
-      });
+      const body = anyField
+        ? { anyField: true, availability: currentUser.availability || 'flexible' }
+        : { subject, availability: currentUser.availability || 'flexible' };
+      const result = await api.request('/matchmaking', { method: 'POST', body });
       if (result.status === 'matched') {
         clearMatchPolling();
         setMatchStatus('Match found. Opening your study room…');
         await openStudySession(result.room, result.participants || []);
       } else if (result.status === 'queued') {
-        setMatchStatus(`Searching for a ${subject} study partner · queue position ${result.queuePosition || '…'}`, true);
+        const description = anyField ? 'a study partner from any field' : `a study partner studying ${subject}`;
+        setMatchStatus(`Searching for ${description} · queue position ${result.queuePosition || '…'}`, true);
         startMatchPolling();
       } else if (result.status === 'retry') {
         clearMatchPolling();
@@ -1019,6 +1026,26 @@
     openModal(profileModal);
   }
 
+  async function deleteProfile() {
+    const button = document.getElementById('deleteProfileButton');
+    if (!window.confirm('Permanently delete your Studyloop account? This cannot be undone.')) return;
+    if (window.prompt('Type DELETE to confirm account deletion.') !== 'DELETE') return;
+
+    button.disabled = true;
+    button.textContent = 'Deleting…';
+    try {
+      await api.request('/users/me', { method: 'DELETE' });
+      clearMatchPolling();
+      realtime.disconnect();
+      api.clearAccessToken();
+      window.location.replace('login.html?accountDeleted=1');
+    } catch (error) {
+      setProfileFeedback(friendlyError(error));
+      button.disabled = false;
+      button.textContent = 'Delete profile';
+    }
+  }
+
   async function saveProfile(event) {
     event.preventDefault();
     const profileForm = document.getElementById('profileForm');
@@ -1086,9 +1113,10 @@
   function wirePageControls() {
     document.getElementById('authGreeting').addEventListener('click', openProfileEditor);
     document.getElementById('profileForm').addEventListener('submit', (event) => void saveProfile(event));
+    document.getElementById('deleteProfileButton').addEventListener('click', () => void deleteProfile());
     studentGrid.addEventListener('click', (event) => {
       const button = event.target.closest('button[data-action="match"]');
-      if (button) void findStudyBuddy(button.dataset.subject || '');
+      if (button) void findStudyBuddy(button.dataset.subject || '', button.dataset.anyField === 'true');
     });
     document.getElementById('startMatchButton').addEventListener('click', () => void findStudyBuddy());
     document.getElementById('cancelMatchButton').addEventListener('click', () => void cancelMatch());

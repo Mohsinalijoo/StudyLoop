@@ -7,7 +7,7 @@ const roomSchema = new mongoose.Schema({
   subjectKey: { type: String, required: true, index: true },
   type: { type: String, enum: ['pair', 'group'], required: true, index: true },
   capacity: { type: Number, min: 2, max: 4, required: true },
-  host: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+  host: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, required() { return this.status === 'active'; }, index: true },
   members: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   participantIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   status: { type: String, enum: ['active', 'closed'], default: 'active', index: true },

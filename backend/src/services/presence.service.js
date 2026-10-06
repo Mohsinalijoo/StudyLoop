@@ -1,5 +1,6 @@
 import { redis } from '../config/redis.js';
 import { env } from '../config/env.js';
+import { activeUserRoomsKey, uncacheRoomMember } from './presence.room-cache.js';
 
 const onlineKey = 'presence:online';
 const primarySocketHash = 'presence:users';
@@ -79,6 +80,20 @@ export async function removeSocket(userId, socketId) {
     arguments: [String(Date.now()), String(env.presenceLeaseMs), String(leaseTtlSeconds * 1000), socketId, userId]
   }));
   return { becameOffline: remaining === 0, remaining };
+}
+
+export async function removeUserPresence(userId) {
+  const id = String(userId);
+  const score = await redis.zScore(onlineKey, id);
+  const roomIds = await redis.sMembers(activeUserRoomsKey(id));
+  await Promise.all(roomIds.map((roomId) => uncacheRoomMember(roomId, id)));
+  const multi = redis.multi();
+  multi.zRem(onlineKey, id);
+  multi.hDel(primarySocketHash, id);
+  multi.del(socketSetKey(id));
+  multi.del(activeUserRoomsKey(id));
+  await multi.exec();
+  return { wasOnline: score != null && Number(score) > Date.now() };
 }
 
 export async function isUserOnline(userId) {

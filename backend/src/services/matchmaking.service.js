@@ -47,7 +47,7 @@ for keyIndex = 1, #KEYS do
         if not ok then
           redis.call('ZREM', KEYS[keyIndex], candidateId)
           redis.call('DEL', entryPrefix .. candidateId)
-        elseif candidate.subjectKey == payload.subjectKey then
+        elseif candidate.anyField == true or payload.anyField == true or candidate.subjectKey == payload.subjectKey then
           local compatible = candidate.availability == payload.availability or candidate.availability == 'flexible' or payload.availability == 'flexible'
           if compatible and (not bestScore or candidateScore < bestScore) then
             bestId = candidateId
@@ -98,8 +98,8 @@ function candidateAvailabilities(availability) {
   return availability === 'flexible' ? ['now', 'later', 'flexible'] : [availability, 'flexible'];
 }
 
-async function enqueue({ userId, subject, availability, displayName }) {
-  const subjectKey = normalizeSubject(subject);
+async function enqueue({ userId, subject, availability, displayName, anyField = false }) {
+  const subjectKey = anyField ? 'all-fields' : normalizeSubject(subject);
   if (!subjectKey) throw new AppError(400, 'INVALID_SUBJECT', 'A valid study subject is required');
   const ownQueue = queueKey(subjectKey, availability);
   const candidates = [...new Set(candidateAvailabilities(availability).map((value) => queueKey(subjectKey, value)))];
@@ -109,6 +109,7 @@ async function enqueue({ userId, subject, availability, displayName }) {
     userId: String(userId),
     subject: subject.trim(),
     subjectKey,
+    anyField,
     availability,
     displayName,
     enqueuedAt: Date.now()
@@ -119,48 +120,54 @@ async function enqueue({ userId, subject, availability, displayName }) {
   });
   if (!Array.isArray(result) || result.length < 2) {
     const rank = await redis.zRank(ownQueue, String(userId));
-    return { status: 'queued', queuePosition: rank == null ? null : rank + 1, subject, availability };
+    return { status: 'queued', queuePosition: rank == null ? null : rank + 1, subject, availability, anyField };
   }
   return { status: 'matched', peerId: String(result[0]), peerEntry: JSON.parse(String(result[1])), subject, availability };
 }
 
-export async function requestMatch({ user, subject, availability }) {
+export async function requestMatch({ user, subject, availability, anyField = false }) {
   if (!(await isUserOnline(user._id))) {
     throw new AppError(409, 'SOCKET_REQUIRED', 'Connect to the real-time server before entering matchmaking');
   }
-  const subjectKey = normalizeSubject(subject);
-  if (!user.subjectKeys?.includes(subjectKey)) {
+  const subjectKey = anyField ? 'all-fields' : normalizeSubject(subject);
+  if (!subjectKey) throw new AppError(400, 'INVALID_SUBJECT', 'A valid study subject is required');
+  if (!anyField && !user.subjectKeys?.includes(subjectKey)) {
     throw new AppError(400, 'SUBJECT_NOT_IN_PROFILE', 'You can only match in a field listed on your profile');
   }
-  const selfResult = await enqueue({ userId: user._id, subject, availability, displayName: user.displayName });
+  const matchSubject = anyField ? 'Any field' : subject;
+  const selfResult = await enqueue({ userId: user._id, subject: matchSubject, availability, displayName: user.displayName, anyField });
   if (selfResult.status === 'queued') return selfResult;
 
   const peerId = selfResult.peerId;
   if (peerId === String(user._id)) throw new AppError(500, 'MATCH_QUEUE_INVALID', 'Matchmaking returned the same user');
+  const peerData = selfResult.peerEntry;
   const peer = await User.findOne({ _id: peerId, isDisabled: false });
-  if (!peer || !peer.subjectKeys?.includes(subjectKey) || !(await isUserOnline(peerId))) {
+  if (!peer
+    || (!anyField && !peerData.anyField && peerData.subjectKey !== subjectKey)
+    || (!peerData.anyField && !peer.subjectKeys?.includes(peerData.subjectKey))
+    || !(await isUserOnline(peerId))) {
     publishMatchFailed([String(user._id)]);
     return { status: 'retry', message: 'That student is no longer available. Please search again.' };
   }
   const currentUser = await User.findOne({ _id: user._id, isDisabled: false });
-  if (!currentUser?.subjectKeys?.includes(subjectKey)) {
+  if (!currentUser || (!anyField && !currentUser.subjectKeys?.includes(subjectKey))) {
     publishMatchFailed([String(user._id)]);
     return { status: 'retry', message: 'Your study fields changed while searching. Please try again.' };
   }
-  const peerData = selfResult.peerEntry;
+  const roomSubject = anyField && !peerData.anyField ? peerData.subject : matchSubject;
+  const roomSubjectKey = anyField && !peerData.anyField ? peerData.subjectKey : subjectKey;
   try {
     const result = await createMatchedRoom({
       firstUser: currentUser,
       secondUser: peer,
-      subject,
-      subjectKey,
-      availability,
+      subject: roomSubject,
+      subjectKey: roomSubjectKey,
       source: 'matchmaking'
     });
     const payload = {
       room: roomDto(result.room),
       participants: [publicUser(currentUser, true), publicUser(peer, await isUserOnline(peer._id))],
-      subject,
+      subject: roomSubject,
       matchedAt: new Date().toISOString()
     };
     publishMatchFound([String(user._id), peerId], payload);
@@ -187,5 +194,5 @@ export async function matchmakingStatus(userId) {
   });
   if (!Array.isArray(result) || result.length < 2) return { status: 'idle' };
   const entry = JSON.parse(String(result[0]));
-  return { status: 'queued', subject: entry.subject, availability: entry.availability, queuePosition: Number(result[1]) };
+  return { status: 'queued', subject: entry.subject, anyField: Boolean(entry.anyField), availability: entry.availability, queuePosition: Number(result[1]) };
 }

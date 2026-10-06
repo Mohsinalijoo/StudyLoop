@@ -17,6 +17,13 @@ if redis.call('GET', KEYS[2]) == ARGV[1] then redis.call('DEL', KEYS[2]) end
 return 1
 `;
 
+const revokeAllUserResetTokensScript = `
+local digest = redis.call('GET', KEYS[1])
+if digest then redis.call('DEL', 'auth:password-reset:' .. digest) end
+redis.call('DEL', KEYS[1])
+return 1
+`;
+
 function sha256(value) {
   return createHash('sha256').update(value).digest('hex');
 }
@@ -50,5 +57,12 @@ export async function revokePasswordResetToken(userId, token) {
   await redis.eval(revokeResetTokenScript, {
     keys: [`auth:password-reset:${digest}`, `auth:password-reset-user:${userId}`],
     arguments: [digest]
+  });
+}
+
+export async function revokeAllPasswordResetTokens(userId) {
+  await redis.eval(revokeAllUserResetTokensScript, {
+    keys: [`auth:password-reset-user:${userId}`],
+    arguments: []
   });
 }

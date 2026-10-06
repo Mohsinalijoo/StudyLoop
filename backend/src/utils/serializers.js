@@ -34,7 +34,7 @@ export function roomDto(room) {
     capacity: room.capacity,
     memberCount: members.length,
     members,
-    hostId: String(room.host?._id ?? room.host),
+    hostId: room.host ? String(room.host?._id ?? room.host) : null,
     status: room.status,
     createdAt: room.createdAt
   };

@@ -408,6 +408,12 @@ h1, h2, h3, p { margin-top: 0; }
 .profile-feedback.is-success { color: #4f9570; }
 .profile-form-actions { display: flex; justify-content: flex-end; gap: 9px; padding-top: 3px; }
 .profile-form-actions .button { min-height: 38px; padding: 0 14px; font-size: 10px; }
+.profile-danger-zone { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 13px; padding: 13px 14px; border: 1px solid #f1d9d8; border-radius: 12px; background: #fffafa; }
+.profile-danger-zone strong { color: #8e4445; font-size: 10px; }
+.profile-danger-zone p { margin: 4px 0 0; color: #9b7778; font-size: 8px; line-height: 1.5; }
+.profile-danger-zone .button-danger { min-height: 34px; flex: 0 0 auto; border-color: #efd0d0; padding: 0 12px; color: #a94447; background: white; font-size: 9px; }
+.profile-danger-zone .button-danger:hover { background: #fff0f0; }
+.profile-danger-zone .button:disabled { cursor: wait; opacity: .6; transform: none; }
 @keyframes modal-in { from { opacity: 0; transform: translateY(12px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
 .modal-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; padding: 23px 25px 18px; }
 .modal-overline { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; color: #8f8ba8; font-size: 8px; font-weight: 820; letter-spacing: .13em; }
@@ -687,6 +693,8 @@ h1, h2, h3, p { margin-top: 0; }
   .modal-header h2 { font-size: 20px; }
   .profile-form { padding: 0 17px 18px; }
   .profile-form-row { grid-template-columns: 1fr; }
+  .profile-danger-zone { align-items: flex-start; flex-direction: column; }
+  .profile-danger-zone .button-danger { align-self: flex-start; }
   .call-layout { padding: 0 14px 14px; }
   .call-stage { min-height: 280px; }
   .call-controls { gap: 5px; }

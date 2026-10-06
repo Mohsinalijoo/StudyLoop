@@ -173,10 +173,13 @@
     }
   }
 
-  if (window.location.search.includes('loggedOut=1')) {
+  const authQuery = new URLSearchParams(window.location.search);
+  if (authQuery.has('accountDeleted') || authQuery.has('loggedOut')) {
     const feedback = document.querySelector('[data-auth-feedback]');
     if (feedback) {
-      feedback.textContent = 'You have been logged out.';
+      feedback.textContent = authQuery.has('accountDeleted')
+        ? 'Your Studyloop account and associated personal data have been deleted.'
+        : 'You have been logged out.';
       feedback.className = 'auth-feedback is-success';
       feedback.hidden = false;
     }

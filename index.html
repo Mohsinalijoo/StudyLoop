@@ -99,7 +99,7 @@
         <div class="section-heading find-heading">
           <div class="section-kicker"><span class="kicker-number">01</span> YOUR PEOPLE ARE OUT THERE</div>
           <div class="heading-row">
-            <div><h2 id="findTitle">Meet your <em>study match.</em></h2><p>Browse real Studyloop members, then start a one-to-one subject match.</p></div>
+            <div><h2 id="findTitle">Meet your <em>study match.</em></h2><p>Browse members from every field, then start a subject-specific or all-fields match.</p></div>
             <div class="find-heading-actions">
               <div class="online-count"><span class="online-pulse"></span><span><strong id="onlineCount">0 students</strong><br>online now</span></div>
               <button class="button button-primary find-match-button" id="startMatchButton" type="button">Find a 1:1 match <span aria-hidden="true">→</span></button>
@@ -139,7 +139,7 @@
           <p id="emptyStateText">No members match those filters yet. Try different criteria or check back later.</p>
           <button class="button button-outline" id="resetSearch" type="button">Show everyone</button>
         </div>
-        <div class="frontend-note" id="studentDataNote"><span aria-hidden="true">✦</span> Member profiles and online presence come from the Studyloop API.</div>
+        <div class="frontend-note" id="studentDataNote"><span aria-hidden="true">✦</span> Member profiles and online presence come from the Studyloop API. Cross-field matches require both students to opt into “All fields of study.”</div>
       </div>
     </section>
 
@@ -229,7 +229,7 @@
         <div class="contact-methods" aria-label="Contact Mohsin Ali">
           <a class="contact-method" href="https://mail.google.com/mail/?view=cm&amp;fs=1&amp;to=mohsinalijoo%40gmail.com" target="_blank" rel="noopener noreferrer">
             <span class="contact-method-icon" aria-hidden="true">@</span>
-            <span class="contact-method-copy"><span class="contact-method-label">EMAIL</span><strong><span class="__cf_email__" data-cfemail="cfa2a0a7bca6a1aea3a6a5a0a08fa8a2aea6a3e1aca0a2">[email&#160;protected]</span></strong></span>
+            <span class="contact-method-copy"><span class="contact-method-label">EMAIL</span><strong><span class="__cf_email__" data-cfemail="6d0002051e04030c01040702022d0a000c0401430e0200">[email&#160;protected]</span></strong></span>
             <span class="contact-method-arrow" aria-hidden="true">↗</span>
           </a>
           <a class="contact-method" href="https://www.linkedin.com/in/mohsinalijoo/" target="_blank" rel="noopener noreferrer">
@@ -302,6 +302,10 @@
         <label for="profileTimezone">Time zone<input id="profileTimezone" name="timezone" type="text" maxlength="80" placeholder="e.g. Asia/Kolkata"></label>
         <p class="profile-feedback" id="profileFeedback" role="status" aria-live="polite" hidden></p>
         <div class="profile-form-actions"><button class="button button-quiet" type="button" data-close-modal>Cancel</button><button class="button button-primary" id="profileSaveButton" type="submit">Save profile <span aria-hidden="true">→</span></button></div>
+        <div class="profile-danger-zone">
+          <div><strong>Delete your profile</strong><p>Permanently remove your account, saved study tools, session history, and your own room messages.</p></div>
+          <button class="button button-danger" id="deleteProfileButton" type="button">Delete profile</button>
+        </div>
       </form>
     </section>
   </div>
@@ -316,5 +320,5 @@
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a464257f6dc20aea',t:'MTc5MTI4NDI1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a464dba7aba09387',t:'MTc5MTI5MTcyMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
