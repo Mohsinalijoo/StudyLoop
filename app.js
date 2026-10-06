@@ -21,7 +21,11 @@
   const roomGrid = document.getElementById('roomGrid');
   const roomsStatus = document.getElementById('roomsStatus');
   const roomCreateForm = document.getElementById('roomCreateForm');
+  const roomLookupForm = document.getElementById('roomLookupForm');
+  const roomSearchResult = document.getElementById('roomSearchResult');
   const matchStatus = document.getElementById('matchStatus');
+  const incomingRequestsList = document.getElementById('incomingRequests');
+  const outgoingRequestsList = document.getElementById('outgoingRequests');
   const matchStatusText = document.getElementById('matchStatusText');
   const cancelMatchButton = document.getElementById('cancelMatchButton');
   const startMatchButton = document.getElementById('startMatchButton');
@@ -47,6 +51,10 @@
   let matchPollTimer = null;
   let searchRequestNumber = 0;
   let roomRequestNumber = 0;
+  let studyRequestLoadNumber = 0;
+  let currentStudyRequests = { incoming: [], outgoing: [] };
+  let activeRooms = [];
+  let searchedRoomId = '';
   let socket = null;
 
   const escapeHTML = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
@@ -137,8 +145,10 @@
     const presenceText = student.online ? 'Online now' : 'Offline';
     const bio = student.bio ? `<p class="student-bio">${escapeHTML(student.bio)}</p>` : '';
     const sharedSubject = student.subjects.find((item) => currentUser.subjects.some((mine) => mine.toLocaleLowerCase() === item.toLocaleLowerCase())) || '';
-    const matchAction = sharedSubject ? `data-subject="${escapeHTML(sharedSubject)}"` : 'data-any-field="true"';
-    const matchLabel = sharedSubject ? `Find a 1:1 match in ${escapeHTML(sharedSubject)}` : 'Find a 1:1 match in any field';
+    const requestSubject = sharedSubject || currentUser.subjects?.[0] || student.subjects[0] || 'General study';
+    const hasPendingRequest = currentStudyRequests.outgoing.some((request) => request.kind === 'direct'
+      && request.status === 'pending' && request.toUser?.id === student.id);
+    const requestLabel = hasPendingRequest ? 'Study request sent' : 'Send study request';
     return `
       <article class="student-card">
         <div class="student-card-top">
@@ -151,8 +161,8 @@
         <div class="student-tags">${topics}</div>
         <div class="student-availability"><span class="online-dot ${student.online ? '' : 'is-away'}"></span><span>${availability}</span></div>
         <div class="student-actions">
-          <button class="invite-button" type="button" data-action="match" ${matchAction}>
-            ${matchLabel}
+          <button class="invite-button" type="button" data-action="study-request" data-user-id="${escapeHTML(student.id)}" data-subject="${escapeHTML(requestSubject)}" ${hasPendingRequest ? 'disabled' : ''}>
+            ${requestLabel} <span aria-hidden="true">→</span>
           </button>
         </div>
       </article>`;
@@ -230,16 +240,23 @@
     const artClasses = ['room-art-library', 'room-art-study', 'room-art-cloud'];
     const members = (room.members || []).map(roomMember);
     const isMember = members.some((member) => member.id === currentUser.id);
+    const isOwner = room.hostId === currentUser.id;
     const full = room.memberCount >= room.capacity && !isMember;
+    const closed = room.status !== 'active';
+    const pendingRequest = currentStudyRequests.outgoing.find((request) => request.kind === 'room'
+      && request.status === 'pending' && request.roomId === room.id);
     const avatars = members.slice(0, 3).map((member) => `<span class="avatar avatar-room ${avatarFor(member.id)}" title="${escapeHTML(member.name)}">${escapeHTML(initialsFor(member.name))}</span>`).join('');
     const spots = Math.max(0, room.capacity - room.memberCount);
-    const label = full ? 'Room full' : isMember ? 'Open room' : 'Join room';
+    const label = closed ? 'Room closed' : pendingRequest ? 'Request pending' : full ? 'Room full' : isMember || isOwner ? 'Open room' : 'Request to join';
+    const disabled = closed || pendingRequest || full;
+    const action = isMember || isOwner ? 'open-room' : 'request-room';
     return `
       <article class="room-card room-card-${colors[index % colors.length]}">
         <div class="room-card-top"><span class="room-category">${escapeHTML(room.subject)} · ${room.type === 'pair' ? '1:1' : 'GROUP'}</span><span class="room-live"><span class="live-dot"></span> ${room.memberCount}/${room.capacity}</span></div>
         <div class="room-art ${artClasses[index % artClasses.length]}" aria-hidden="true">${art[index % art.length]}</div>
         <h3>${escapeHTML(room.title)}</h3><p>${escapeHTML(room.subject)} · ${spots ? `${spots} ${spots === 1 ? 'seat' : 'seats'} open` : 'At capacity'}</p>
-        <div class="room-card-bottom"><div class="room-avatars" aria-label="${room.memberCount} of ${room.capacity} members">${avatars}<span class="room-people">${room.memberCount} ${room.memberCount === 1 ? 'studying' : 'studying'}</span></div><button class="room-join" type="button" data-room-id="${escapeHTML(room.id)}" ${full ? 'disabled' : ''}>${label} <span aria-hidden="true">↗</span></button></div>
+        <div class="room-id-row"><span>ROOM ID</span><code>${escapeHTML(room.id)}</code><button type="button" data-copy-room-id="${escapeHTML(room.id)}" aria-label="Copy room ID ${escapeHTML(room.id)}">Copy</button></div>
+        <div class="room-card-bottom"><div class="room-avatars" aria-label="${room.memberCount} of ${room.capacity} members">${avatars}<span class="room-people">${room.memberCount} studying</span></div><button class="room-join" type="button" data-room-id="${escapeHTML(room.id)}" data-room-action="${action}" ${disabled ? 'disabled' : ''}>${label} <span aria-hidden="true">↗</span></button></div>
       </article>`;
   }
 
@@ -249,14 +266,218 @@
     try {
       const rooms = await api.request('/rooms?limit=50');
       if (requestNumber !== roomRequestNumber) return;
-      const activeRooms = Array.isArray(rooms) ? rooms : [];
+      activeRooms = Array.isArray(rooms) ? rooms : [];
       roomGrid.innerHTML = activeRooms.map(renderRoom).join('');
       roomsStatus.textContent = activeRooms.length ? `${activeRooms.length} active ${activeRooms.length === 1 ? 'room' : 'rooms'}` : 'No active rooms yet. Create one to get started.';
     } catch (error) {
       if (requestNumber !== roomRequestNumber) return;
       roomsStatus.textContent = 'Could not load rooms.';
+      activeRooms = [];
       roomGrid.replaceChildren();
       reportError(error);
+    }
+  }
+
+  function renderIncomingStudyRequest(request) {
+    const sender = request.fromUser?.displayName || 'A Studyloop student';
+    const isRoomRequest = request.kind === 'room';
+    const roomTitle = request.room?.title || 'a study room';
+    const detail = isRoomRequest
+      ? `Wants to join ${escapeHTML(roomTitle)} · ${escapeHTML(request.subject)}`
+      : `Wants to study with you · ${escapeHTML(request.subject)}`;
+    const title = isRoomRequest ? `${escapeHTML(sender)} requested to join your room` : `${escapeHTML(sender)} wants a 1:1 study session`;
+    const approveLabel = isRoomRequest ? 'Approve & add' : 'Accept & open session';
+    return `
+      <article class="study-request-card">
+        <div class="study-request-card-top"><span class="request-kind">${isRoomRequest ? 'ROOM JOIN' : '1:1 STUDY'}</span><span class="request-state request-state-pending">Pending</span></div>
+        <h4>${title}</h4>
+        <p>${detail}</p>
+        ${isRoomRequest && request.room?.id ? `<div class="request-room-id">Room ID <code>${escapeHTML(request.room.id)}</code></div>` : ''}
+        <time datetime="${escapeHTML(request.createdAt || '')}">${escapeHTML(formatTime(request.createdAt))}</time>
+        <div class="study-request-actions">
+          <button class="button button-primary" type="button" data-request-action="accept" data-request-id="${escapeHTML(request.id)}">${approveLabel}</button>
+          <button class="button button-quiet" type="button" data-request-action="decline" data-request-id="${escapeHTML(request.id)}">Decline</button>
+        </div>
+      </article>`;
+  }
+
+  function renderOutgoingStudyRequest(request) {
+    const recipient = request.toUser?.displayName || 'Studyloop student';
+    const isRoomRequest = request.kind === 'room';
+    const roomTitle = request.room?.title || 'a study room';
+    const detail = isRoomRequest
+      ? `Join request for ${escapeHTML(roomTitle)} · ${escapeHTML(request.subject)}`
+      : `1:1 study request · ${escapeHTML(request.subject)}`;
+    const labels = { pending: 'Pending', accepted: 'Accepted', declined: 'Declined', expired: 'Expired' };
+    const state = labels[request.status] || 'Updated';
+    const openRoom = request.status === 'accepted' && request.resultRoom?.id
+      ? `<button class="button button-outline" type="button" data-open-room-id="${escapeHTML(request.resultRoom.id)}">Open ${request.kind === 'direct' ? 'session' : 'room'} <span aria-hidden="true">↗</span></button>`
+      : '';
+    const cancel = request.status === 'pending'
+      ? `<button class="button button-quiet" type="button" data-request-action="cancel" data-request-id="${escapeHTML(request.id)}">Cancel request</button>`
+      : '';
+    return `
+      <article class="study-request-card study-request-card-sent">
+        <div class="study-request-card-top"><span class="request-kind">${isRoomRequest ? 'ROOM JOIN' : '1:1 STUDY'}</span><span class="request-state request-state-${escapeHTML(request.status)}">${state}</span></div>
+        <h4>${isRoomRequest ? `Room owner · ${escapeHTML(recipient)}` : escapeHTML(recipient)}</h4>
+        <p>${detail}</p>
+        <time datetime="${escapeHTML(request.createdAt || '')}">${escapeHTML(formatTime(request.createdAt))}</time>
+        <div class="study-request-actions">${openRoom}${cancel}</div>
+      </article>`;
+  }
+
+  function renderStudyRequests() {
+    const incoming = currentStudyRequests.incoming || [];
+    const outgoing = currentStudyRequests.outgoing || [];
+    const incomingCount = document.getElementById('incomingRequestCount');
+    const outgoingCount = document.getElementById('outgoingRequestCount');
+    const requestSummary = document.getElementById('requestSummary');
+    const requestBadge = document.getElementById('requestCountBadge');
+    incomingCount.textContent = String(incoming.length);
+    outgoingCount.textContent = String(outgoing.length);
+    requestBadge.textContent = String(incoming.length);
+    requestBadge.hidden = incoming.length === 0;
+    requestSummary.textContent = incoming.length
+      ? `${incoming.length} request${incoming.length === 1 ? '' : 's'} waiting for your response`
+      : 'You’re all caught up';
+    incomingRequestsList.innerHTML = incoming.length
+      ? incoming.map(renderIncomingStudyRequest).join('')
+      : '<p class="request-empty">No incoming requests right now.</p>';
+    outgoingRequestsList.innerHTML = outgoing.length
+      ? outgoing.map(renderOutgoingStudyRequest).join('')
+      : '<p class="request-empty">You have not sent any study requests yet.</p>';
+    renderStudents();
+  }
+
+  async function loadStudyRequests() {
+    const requestNumber = ++studyRequestLoadNumber;
+    try {
+      const result = await api.request('/study-requests');
+      if (requestNumber !== studyRequestLoadNumber) return;
+      currentStudyRequests = {
+        incoming: Array.isArray(result.incoming) ? result.incoming : [],
+        outgoing: Array.isArray(result.outgoing) ? result.outgoing : []
+      };
+      renderStudyRequests();
+      roomGrid.innerHTML = activeRooms.map(renderRoom).join('');
+    } catch (error) {
+      if (requestNumber !== studyRequestLoadNumber) return;
+      document.getElementById('requestSummary').textContent = 'Could not load requests';
+      incomingRequestsList.innerHTML = '<p class="request-empty">Could not load incoming requests.</p>';
+      outgoingRequestsList.innerHTML = '<p class="request-empty">Could not load sent requests.</p>';
+      reportError(error);
+    }
+  }
+
+  async function sendDirectStudyRequest(button) {
+    const toUserId = button.dataset.userId;
+    const subject = button.dataset.subject || currentUser.subjects?.[0] || 'General study';
+    const originalText = button.textContent.trim();
+    button.disabled = true;
+    button.textContent = 'Sending request…';
+    try {
+      const result = await api.request('/study-requests/direct', {
+        method: 'POST',
+        body: { toUserId, subject }
+      });
+      const recipientName = students.find((student) => student.id === toUserId)?.name || 'that student';
+      showToast(result.alreadyPending ? `Your request to ${recipientName} is still pending.` : `Study request sent to ${recipientName}.`);
+      await loadStudyRequests();
+    } catch (error) {
+      reportError(error);
+      button.disabled = false;
+      button.textContent = originalText || 'Send study request';
+    }
+  }
+
+  async function respondToStudyRequest(requestId, action, button) {
+    if (!requestId) return;
+    const originalText = button?.textContent || '';
+    if (button) {
+      button.disabled = true;
+      if (action === 'accept') button.textContent = 'Opening…';
+      else if (action === 'decline') button.textContent = 'Declining…';
+      else button.textContent = 'Cancelling…';
+    }
+    try {
+      const result = action === 'cancel'
+        ? await api.request(`/study-requests/${encodeURIComponent(requestId)}`, { method: 'DELETE' })
+        : await api.request(`/study-requests/${encodeURIComponent(requestId)}/${action}`, { method: 'POST', body: {} });
+      await loadStudyRequests();
+      if (action === 'accept' && result.resultRoom?.id) {
+        await loadRooms();
+        await openRoomById(result.resultRoom.id);
+      } else if (action === 'decline') {
+        showToast('Request declined.');
+      } else if (action === 'cancel') {
+        showToast('Study request cancelled.');
+      }
+      if (searchedRoomId) void lookupRoomById(searchedRoomId, false);
+    } catch (error) {
+      reportError(error);
+      if (button) {
+        button.disabled = false;
+        button.textContent = originalText;
+      }
+    }
+  }
+
+  function setRoomLookupFeedback(message, isError = false) {
+    const feedback = document.getElementById('roomLookupFeedback');
+    feedback.textContent = message;
+    feedback.hidden = !message;
+    feedback.classList.toggle('is-error', isError);
+  }
+
+  async function lookupRoomById(value, showFeedback = true) {
+    const roomId = String(value || '').trim().toLowerCase();
+    if (!/^[a-f0-9]{24}$/.test(roomId)) {
+      searchedRoomId = '';
+      roomSearchResult.hidden = true;
+      if (showFeedback) setRoomLookupFeedback('Enter a valid 24-character room ID.', true);
+      return;
+    }
+    try {
+      const result = await api.request(`/rooms/${encodeURIComponent(roomId)}`);
+      if (!result?.room?.id) throw new Error('Room not found. Double-check the ID and try again.');
+      searchedRoomId = result.room.id;
+      roomSearchResult.innerHTML = renderRoom(result.room, 0);
+      roomSearchResult.hidden = false;
+      if (showFeedback) setRoomLookupFeedback('Room found. Send a request to the owner to join.');
+    } catch (error) {
+      searchedRoomId = '';
+      roomSearchResult.hidden = true;
+      if (showFeedback) setRoomLookupFeedback(friendlyError(error), true);
+    }
+  }
+
+  async function sendRoomJoinRequest(roomId, button) {
+    const originalText = button?.textContent || '';
+    if (button) {
+      button.disabled = true;
+      button.textContent = 'Sending request…';
+    }
+    try {
+      const result = await api.request(`/study-requests/rooms/${encodeURIComponent(roomId)}`, { method: 'POST', body: {} });
+      showToast(result.alreadyPending ? 'Your room request is still pending.' : 'Join request sent to the room owner.');
+      await Promise.all([loadStudyRequests(), loadRooms()]);
+      if (searchedRoomId) await lookupRoomById(searchedRoomId, false);
+    } catch (error) {
+      reportError(error);
+      if (button) {
+        button.disabled = false;
+        button.textContent = originalText || 'Request to join';
+      }
+    }
+  }
+
+  async function copyRoomId(button) {
+    const roomId = button.dataset.copyRoomId;
+    try {
+      await navigator.clipboard.writeText(roomId);
+      showToast('Room ID copied. Share it with the people you want to invite.');
+    } catch {
+      showToast(`Room ID: ${roomId}`);
     }
   }
 
@@ -659,7 +880,9 @@
     activeSession = { roomId: room.id, room, participants: members };
 
     document.getElementById('callModalTitle').textContent = isGroup ? roomTitle : 'Your 1:1 study session';
-    document.getElementById('callSubtitle').textContent = `${subject} · ${isGroup ? `${room.memberCount || members.length} person group room` : 'one-to-one match'}`;
+    document.getElementById('callSubtitle').textContent = `${subject} · ${isGroup ? `${room.memberCount || members.length} person group room` : 'one-to-one study room'}`;
+    document.getElementById('callRoomId').textContent = room.id;
+    document.getElementById('copyCallRoomId').dataset.copyRoomId = room.id;
     document.getElementById('chatTitle').textContent = isGroup ? 'Room chat' : (partner?.name || 'Study partner');
     document.getElementById('chatSubtitle').textContent = isGroup ? `${roomTitle} · messages are shared with members` : `${subject} · private study room`;
     const peerName = isGroup ? `${room.memberCount || members.length} people studying` : (partner?.name || 'Your study partner');
@@ -709,8 +932,8 @@
     }
   }
 
-  async function joinRoom(roomId) {
-    const button = [...roomGrid.querySelectorAll('[data-room-id]')].find((item) => item.dataset.roomId === roomId);
+  async function joinRoom(roomId, clickedButton = null) {
+    const button = clickedButton || [...roomGrid.querySelectorAll('[data-room-id]')].find((item) => item.dataset.roomId === roomId);
     if (button) button.disabled = true;
     try {
       const result = await realtime.emitAck('room:join', { roomId });
@@ -859,6 +1082,23 @@
     socket.on('match:failed', ({ message }) => {
       clearMatchPolling();
       setMatchStatus(message || 'The match could not be opened. Try again.');
+    });
+    socket.on('study-request:received', (request) => {
+      const sender = request.fromUser?.displayName || 'A Studyloop student';
+      showToast(request.kind === 'room' ? `${sender} requested to join your room.` : `${sender} sent you a 1:1 study request.`);
+      void loadStudyRequests();
+    });
+    socket.on('study-request:updated', (request) => {
+      void loadStudyRequests();
+      if (searchedRoomId && request.kind === 'room') void lookupRoomById(searchedRoomId, false);
+      if (request.fromUser?.id === currentUser.id && request.status === 'accepted' && request.resultRoom?.id) {
+        showToast(request.kind === 'room' ? 'Your room request was approved.' : 'Your study request was accepted.');
+        void openRoomById(request.resultRoom.id);
+      } else if (request.fromUser?.id === currentUser.id && request.status === 'declined') {
+        showToast('Your study request was declined.');
+      } else if (request.toUser?.id === currentUser.id && request.status === 'cancelled') {
+        showToast('A study request was cancelled.');
+      }
     });
     socket.on('user_joined', ({ roomId, user, memberCount }) => {
       if (activeSession?.roomId !== roomId) return;
@@ -1115,8 +1355,8 @@
     document.getElementById('profileForm').addEventListener('submit', (event) => void saveProfile(event));
     document.getElementById('deleteProfileButton').addEventListener('click', () => void deleteProfile());
     studentGrid.addEventListener('click', (event) => {
-      const button = event.target.closest('button[data-action="match"]');
-      if (button) void findStudyBuddy(button.dataset.subject || '', button.dataset.anyField === 'true');
+      const button = event.target.closest('button[data-action="study-request"]');
+      if (button && !button.disabled) void sendDirectStudyRequest(button);
     });
     document.getElementById('startMatchButton').addEventListener('click', () => void findStudyBuddy());
     document.getElementById('cancelMatchButton').addEventListener('click', () => void cancelMatch());
@@ -1144,10 +1384,44 @@
       availabilityFilter.value = 'any';
       void loadStudents();
     });
-    roomGrid.addEventListener('click', (event) => {
-      const button = event.target.closest('[data-room-id]');
-      if (button && !button.disabled) void joinRoom(button.dataset.roomId);
+    const handleRoomCardClick = (event) => {
+      const copyButton = event.target.closest('[data-copy-room-id]');
+      if (copyButton) {
+        void copyRoomId(copyButton);
+        return;
+      }
+      const button = event.target.closest('button[data-room-action]');
+      if (!button || button.disabled) return;
+      if (button.dataset.roomAction === 'open-room') void joinRoom(button.dataset.roomId, button);
+      else if (button.dataset.roomAction === 'request-room') void sendRoomJoinRequest(button.dataset.roomId, button);
+    };
+    roomGrid.addEventListener('click', handleRoomCardClick);
+    roomSearchResult.addEventListener('click', handleRoomCardClick);
+    callModal.addEventListener('click', handleRoomCardClick);
+    roomLookupForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      void lookupRoomById(roomLookupForm.elements.roomId.value);
     });
+    roomLookupForm.elements.roomId.addEventListener('input', () => {
+      if (!roomLookupForm.elements.roomId.value.trim()) {
+        searchedRoomId = '';
+        roomSearchResult.hidden = true;
+        setRoomLookupFeedback('');
+      }
+    });
+    const handleRequestAction = (event) => {
+      const openButton = event.target.closest('[data-open-room-id]');
+      if (openButton) {
+        void openRoomById(openButton.dataset.openRoomId);
+        return;
+      }
+      const button = event.target.closest('[data-request-action]');
+      if (button && !button.disabled) {
+        void respondToStudyRequest(button.dataset.requestId, button.dataset.requestAction, button);
+      }
+    };
+    incomingRequestsList.addEventListener('click', handleRequestAction);
+    outgoingRequestsList.addEventListener('click', handleRequestAction);
     roomCreateForm.addEventListener('submit', (event) => void createRoom(event));
 
     document.querySelectorAll('[data-toast]').forEach((button) => {
@@ -1198,11 +1472,12 @@
     } catch (error) {
       showToast(`Realtime unavailable: ${friendlyError(error)}`);
     }
-    await Promise.all([loadStudents(), loadRooms()]);
+    await Promise.all([loadStudents(), loadRooms(), loadStudyRequests()]);
     window.setInterval(() => {
       if (document.visibilityState === 'visible') {
         void loadStudents();
         void loadRooms();
+        void loadStudyRequests();
       }
     }, 30000);
   }
