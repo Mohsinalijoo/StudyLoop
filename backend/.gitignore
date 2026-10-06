@@ -1,0 +1,17 @@
+# Secrets and local environment files
+.env
+.env.*
+!.env.example
+backend/.env
+
+# Dependencies, caches, and deployment metadata
+node_modules/
+**/node_modules/
+.npm/
+.vercel/
+
+# Local outputs and uploaded/attached files
+coverage/
+uploads/
+*.log
+.DS_Store

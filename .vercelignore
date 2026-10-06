@@ -1,0 +1,8 @@
+backend/
+uploads/
+.npm/
+node_modules/
+**/node_modules/
+.env
+.env.*
+README.md
