@@ -19,13 +19,13 @@ export const create = asyncHandler(async (req, res) => {
 export const list = asyncHandler(async (req, res) => {
   const limit = parseLimit(req.query.limit, 20, 100);
   const subject = req.query.subject ? requireString(req.query.subject, 'subject', { min: 2, max: 80 }) : undefined;
-  const rooms = await listActiveRooms({ subject, limit });
+  const rooms = await listActiveRooms({ subject, limit, userId: req.auth.userId });
   res.json({ data: rooms.map(roomDto) });
 });
 
 export const getOne = asyncHandler(async (req, res) => {
   const roomId = requireObjectId(req.params.roomId, 'roomId');
-  res.json({ data: { room: roomDto(await getRoom(roomId)) } });
+  res.json({ data: { room: roomDto(await getRoom(roomId, req.auth.userId)) } });
 });
 
 export const join = asyncHandler(async (req, res) => {

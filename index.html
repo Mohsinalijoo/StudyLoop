@@ -12,7 +12,7 @@
   <script src="api.js" defer></script>
   <script src="auth.js" defer></script>
   <script src="realtime.js" defer></script>
-  <script src="app.js?v=20261005-2" defer></script>
+  <script src="app.js?v=20261006-2" defer></script>
   <script src="study-tools.js" defer></script>
 </head>
 <body class="auth-pending" data-auth-protected="true">
@@ -35,6 +35,7 @@
 
       <nav class="main-nav" id="mainNav" aria-label="Main navigation">
         <a href="#find">Find a buddy</a>
+        <a href="#requests">Requests <span class="nav-request-count" id="requestCountBadge" hidden>0</span></a>
         <a href="#rooms">Study rooms</a>
         <a href="#tools">Study tools</a>
         <a class="mobile-login-link" id="mobileLoginLink" href="login.html">Log in</a>
@@ -99,10 +100,10 @@
         <div class="section-heading find-heading">
           <div class="section-kicker"><span class="kicker-number">01</span> YOUR PEOPLE ARE OUT THERE</div>
           <div class="heading-row">
-            <div><h2 id="findTitle">Meet your <em>study match.</em></h2><p>Browse members from every field, then start a subject-specific or all-fields match.</p></div>
+            <div><h2 id="findTitle">Meet your <em>study match.</em></h2><p>Send a request from a student’s card, or use Quick match with another student who is waiting.</p></div>
             <div class="find-heading-actions">
               <div class="online-count"><span class="online-pulse"></span><span><strong id="onlineCount">0 students</strong><br>online now</span></div>
-              <button class="button button-primary find-match-button" id="startMatchButton" type="button">Find a 1:1 match <span aria-hidden="true">→</span></button>
+              <button class="button button-primary find-match-button" id="startMatchButton" type="button">Quick 1:1 match <span aria-hidden="true">→</span></button>
             </div>
           </div>
         </div>
@@ -139,7 +140,29 @@
           <p id="emptyStateText">No members match those filters yet. Try different criteria or check back later.</p>
           <button class="button button-outline" id="resetSearch" type="button">Show everyone</button>
         </div>
-        <div class="frontend-note" id="studentDataNote"><span aria-hidden="true">✦</span> Member profiles and online presence come from the Studyloop API. Cross-field matches require both students to opt into “All fields of study.”</div>
+        <div class="frontend-note" id="studentDataNote"><span aria-hidden="true">✦</span> Member profiles and online presence come from the Studyloop API. Quick cross-field matching requires both students to choose “All fields”; direct requests are sent to the student you select.</div>
+      </div>
+    </section>
+
+    <section class="request-section" id="requests" aria-labelledby="requestsTitle">
+      <div class="container request-container">
+        <div class="section-heading request-section-heading">
+          <div class="section-kicker"><span class="kicker-number">02</span> YOUR INBOX, YOUR CHOICE</div>
+          <div class="heading-row">
+            <div><h2 id="requestsTitle">Study <em>requests.</em></h2><p>Accept or decline study invitations and room join requests.</p></div>
+            <span class="request-summary" id="requestSummary" aria-live="polite">Loading requests…</span>
+          </div>
+        </div>
+        <div class="study-request-grid">
+          <section class="request-panel" aria-labelledby="incomingRequestsTitle">
+            <div class="request-panel-heading"><div><h3 id="incomingRequestsTitle">Incoming</h3><p>Choose who joins your study time.</p></div><span class="request-count" id="incomingRequestCount">0</span></div>
+            <div class="request-list" id="incomingRequests" aria-live="polite"><p class="request-empty">Loading incoming requests…</p></div>
+          </section>
+          <section class="request-panel" aria-labelledby="outgoingRequestsTitle">
+            <div class="request-panel-heading"><div><h3 id="outgoingRequestsTitle">Sent</h3><p>Track invitations you have sent.</p></div><span class="request-count request-count-muted" id="outgoingRequestCount">0</span></div>
+            <div class="request-list" id="outgoingRequests" aria-live="polite"><p class="request-empty">Loading sent requests…</p></div>
+          </section>
+        </div>
       </div>
     </section>
 
@@ -147,9 +170,15 @@
       <svg class="section-wave rooms-wave-top" viewBox="0 0 1440 100" preserveAspectRatio="none" aria-hidden="true"><path d="M0 0h1440v33c-180 42-326 51-528 29C720 34 622 15 444 39 275 62 150 79 0 55V0Z" fill="#f2f2fa"/></svg>
       <div class="container rooms-container">
         <div class="section-heading rooms-heading">
-          <div class="section-kicker section-kicker-light"><span class="kicker-number">02</span> YOUR STUDY CORNER, ONLINE</div>
+          <div class="section-kicker section-kicker-light"><span class="kicker-number">03</span> YOUR STUDY CORNER, ONLINE</div>
           <div class="heading-row"><div><h2 id="roomsTitle">Find your <em>focus room.</em></h2><p>Drop into a welcoming room, work alongside other students, and keep each other on track.</p></div><a class="text-link text-link-light" href="#tools">See your study toolkit <span aria-hidden="true">→</span></a></div>
         </div>
+        <form class="room-id-search" id="roomLookupForm">
+          <label for="roomIdInput"><span class="room-id-search-icon" aria-hidden="true">⌕</span> Have a room ID? <input id="roomIdInput" name="roomId" type="text" inputmode="text" maxlength="24" autocomplete="off" placeholder="Paste the 24-character room ID"></label>
+          <button class="button button-light" type="submit">Find room <span aria-hidden="true">→</span></button>
+          <p class="room-lookup-feedback" id="roomLookupFeedback" role="status" aria-live="polite" hidden></p>
+        </form>
+        <div class="room-search-result" id="roomSearchResult" hidden></div>
         <details class="room-create-details">
           <summary><span aria-hidden="true">＋</span> Create a study room</summary>
           <form class="room-create-form" id="roomCreateForm">
@@ -170,7 +199,7 @@
     <section class="tools-section" id="tools" aria-labelledby="toolsTitle">
       <div class="container tools-container">
         <div class="section-heading tools-heading">
-          <div class="section-kicker"><span class="kicker-number">03</span> TINY TOOLS, BETTER SESSIONS</div>
+          <div class="section-kicker"><span class="kicker-number">04</span> TINY TOOLS, BETTER SESSIONS</div>
           <div class="heading-row"><div><h2 id="toolsTitle">Make focus feel <em>doable.</em></h2><p>Everything you need to get started, without opening twelve tabs.</p></div><span class="tools-sticker" aria-hidden="true">Your focus era<br>starts here <b>↘</b></span></div>
         </div>
 
@@ -229,7 +258,7 @@
         <div class="contact-methods" aria-label="Contact Mohsin Ali">
           <a class="contact-method" href="https://mail.google.com/mail/?view=cm&amp;fs=1&amp;to=mohsinalijoo%40gmail.com" target="_blank" rel="noopener noreferrer">
             <span class="contact-method-icon" aria-hidden="true">@</span>
-            <span class="contact-method-copy"><span class="contact-method-label">EMAIL</span><strong><span class="__cf_email__" data-cfemail="6d0002051e04030c01040702022d0a000c0401430e0200">mohsinalijoo@gmail.com</span></strong></span>
+            <span class="contact-method-copy"><span class="contact-method-label">EMAIL</span><strong><span class="__cf_email__" data-cfemail="076a686f746e69666b6e6d686847606a666e6b2964686a">mohsinalijoo@gmail.com</span></strong></span>
             <span class="contact-method-arrow" aria-hidden="true">↗</span>
           </a>
           <a class="contact-method" href="https://www.linkedin.com/in/mohsinalijoo/" target="_blank" rel="noopener noreferrer">
@@ -253,7 +282,7 @@
 
   <div class="modal-backdrop" id="callModal" hidden>
     <section class="modal-panel call-modal" role="dialog" aria-modal="true" aria-labelledby="callModalTitle">
-      <div class="modal-header"><div><div class="modal-overline"><span class="live-dot"></span> LIVE STUDY SPACE</div><h2 id="callModalTitle">Your study room</h2><p id="callSubtitle">Join a match or room to begin</p></div><button class="modal-close" type="button" data-close-modal aria-label="Close study session">×</button></div>
+      <div class="modal-header"><div><div class="modal-overline"><span class="live-dot"></span> LIVE STUDY SPACE</div><h2 id="callModalTitle">Your study room</h2><p id="callSubtitle">Join a match or room to begin</p><div class="call-room-id"><span>ROOM ID <code id="callRoomId"></code></span><button class="call-room-id-copy" id="copyCallRoomId" type="button" data-copy-room-id="">Copy ID</button></div></div><button class="modal-close" type="button" data-close-modal aria-label="Close study session">×</button></div>
       <div class="call-layout">
         <div class="call-main-column">
           <div class="call-stage" id="callStage">
@@ -320,5 +349,5 @@
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a464dba7aba09387',t:'MTc5MTI5MTcyMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4653edfc87425d9',t:'MTc5MTI5NTc4NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>

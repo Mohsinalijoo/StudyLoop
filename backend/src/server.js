@@ -11,12 +11,13 @@ import { Session } from './models/Session.js';
 import { ChatMessage } from './models/ChatMessage.js';
 import { StudyNote } from './models/StudyNote.js';
 import { Flashcard } from './models/Flashcard.js';
+import { StudyRequest } from './models/StudyRequest.js';
 
 let httpServer;
 let shuttingDown = false;
 
 async function ensureIndexes() {
-  await Promise.all([User.createIndexes(), Room.createIndexes(), Session.createIndexes(), ChatMessage.createIndexes(), StudyNote.createIndexes(), Flashcard.createIndexes()]);
+  await Promise.all([User.createIndexes(), Room.createIndexes(), Session.createIndexes(), ChatMessage.createIndexes(), StudyNote.createIndexes(), Flashcard.createIndexes(), StudyRequest.createIndexes()]);
 }
 
 async function start() {

@@ -90,7 +90,7 @@ export async function createMatchedRoom({ firstUser, secondUser, subject, subjec
   return { room, joined: true, session: { joinedAt } };
 }
 
-export async function joinRoom({ roomId, userId, source = 'api' }) {
+export async function joinRoom({ roomId, userId, source = 'api', ownerApproved = false }) {
   return withDistributedLock(`lock:room:${roomId}`, async () => {
     const result = await withMongoTransaction(async (tx) => {
       const room = await Room.findById(roomId).session(tx);
@@ -103,6 +103,9 @@ export async function joinRoom({ roomId, userId, source = 'api' }) {
           activeSession = createdSession;
         }
         return { room, joined: false, session: activeSession };
+      }
+      if (!sameId(room.host, userId) && !ownerApproved) {
+        throw new AppError(403, 'ROOM_JOIN_REQUEST_REQUIRED', 'Send a request to the room owner and wait for approval before joining');
       }
       if (room.members.length >= room.capacity) throw new AppError(409, 'ROOM_FULL', 'This room has reached its participant limit');
       room.members.addToSet(userId);
@@ -179,16 +182,22 @@ export async function canAccessRoom({ roomId, userId }) {
   return room;
 }
 
-export async function listActiveRooms({ subject, limit = 20 }) {
-  const filter = { status: 'active' };
+export async function listActiveRooms({ subject, limit = 20, userId }) {
+  const filter = {
+    status: 'active',
+    $or: [{ type: 'group' }, { type: 'pair', members: userId }]
+  };
   if (subject) filter.subjectKey = normalizeSubject(subject);
   return Room.find(filter).sort({ createdAt: -1 }).limit(limit)
     .populate('members', 'displayName subjects availability')
     .lean();
 }
 
-export async function getRoom(roomId) {
-  const room = await Room.findById(roomId).populate('members', 'displayName subjects availability').lean();
+export async function getRoom(roomId, userId) {
+  const room = await Room.findOne({
+    _id: roomId,
+    $or: [{ type: 'group' }, { type: 'pair', members: userId }]
+  }).populate('members', 'displayName subjects availability').lean();
   if (!room) throw new AppError(404, 'ROOM_NOT_FOUND', 'Room not found');
   return room;
 }

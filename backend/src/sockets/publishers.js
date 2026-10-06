@@ -56,3 +56,14 @@ export function publishMatchFailed(userIds, message = 'A study match could not b
   const io = getSocketServer();
   for (const userId of userIds) io.to(userSocketRoom(userId)).emit('match:failed', { message });
 }
+
+export function publishStudyRequestReceived(userId, request) {
+  getSocketServer().to(userSocketRoom(userId)).emit('study-request:received', request);
+}
+
+export function publishStudyRequestUpdated(userIds, request) {
+  const io = getSocketServer();
+  for (const userId of new Set(userIds.map(String))) {
+    if (userId) io.to(userSocketRoom(userId)).emit('study-request:updated', request);
+  }
+}

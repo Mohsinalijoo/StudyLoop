@@ -6,7 +6,7 @@ const sessionSchema = new mongoose.Schema({
   joinedAt: { type: Date, required: true, default: Date.now },
   leftAt: { type: Date, default: null, index: true },
   durationSeconds: { type: Number, default: 0, min: 0 },
-  source: { type: String, enum: ['api', 'socket', 'matchmaking'], default: 'api' }
+  source: { type: String, enum: ['api', 'socket', 'matchmaking', 'request'], default: 'api' }
 }, { timestamps: true });
 
 sessionSchema.index({ userId: 1, joinedAt: -1 });
