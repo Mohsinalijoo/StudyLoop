@@ -61,6 +61,16 @@
 .auth-main-signup { padding-top: 42px; padding-bottom: 50px; }
 .auth-main-signup .auth-layout { grid-template-columns: minmax(0, 1fr) minmax(430px, .9fr); }
 .auth-form-signup { gap: 12px; }
+.auth-field-assist { display: flex; justify-content: flex-end; margin-top: -9px; }
+.auth-field-assist a { color: var(--lilac-dark); font-size: 10px; font-weight: 720; }
+.auth-field-assist a:hover { text-decoration: underline; }
+.social-auth { margin-top: 17px; }
+.social-auth-divider { display: flex; align-items: center; gap: 12px; margin: 0 0 14px; color: #a0a5b1; font-size: 9px; }
+.social-auth-divider::before, .social-auth-divider::after { content: ""; flex: 1; height: 1px; background: #efedf3; }
+.social-auth-divider span { white-space: nowrap; }
+.google-button-host { display: flex; justify-content: center; min-height: 40px; }
+.google-button-host > div { max-width: 100%; }
+.social-auth .auth-feedback { margin-top: 10px; }
 
 @media (max-width: 820px) {
   .auth-main { min-height: calc(100vh - 122px); padding: 44px 0 54px; }

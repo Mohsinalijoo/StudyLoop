@@ -4,6 +4,7 @@ const userSchema = new mongoose.Schema({
   displayName: { type: String, required: true, trim: true, minlength: 2, maxlength: 60 },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true, maxlength: 254, index: true },
   passwordHash: { type: String, required: true, select: false },
+  googleId: { type: String, unique: true, sparse: true, select: false },
   subjects: { type: [String], required: true, default: [], validate: [(items) => items.length >= 1 && items.length <= 10, 'Choose 1–10 study fields'] },
   subjectKeys: { type: [String], required: true, default: [], index: true },
   availability: { type: String, enum: ['now', 'later', 'flexible'], default: 'flexible', index: true },

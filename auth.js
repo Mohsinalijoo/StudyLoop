@@ -181,4 +181,62 @@
       feedback.hidden = false;
     }
   }
+
+  const googleSection = document.querySelector('[data-google-signin]');
+  if (googleSection) {
+    const clientId = document.querySelector('meta[name="google-client-id"]')?.content.trim();
+    if (clientId) {
+      const googleButton = googleSection.querySelector('[data-google-button]');
+      const feedback = googleSection.querySelector('[data-google-feedback]');
+      googleSection.hidden = false;
+
+      function googleFeedback(message, type = 'error') {
+        if (!feedback) return;
+        feedback.textContent = message;
+        feedback.className = `auth-feedback is-${type}`;
+        feedback.hidden = !message;
+      }
+
+      function renderGoogleButton() {
+        if (!window.google?.accounts?.id || !googleButton) {
+          googleFeedback('Google sign-in could not load. Check your connection and try again.');
+          return;
+        }
+        window.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: async (response) => {
+            googleFeedback('');
+            if (!response?.credential) {
+              googleFeedback('Google did not return a sign-in credential. Please try again.');
+              return;
+            }
+            try {
+              const result = await api.googleLogin(response.credential);
+              if (!result?.accessToken) throw new Error('The API response did not include an access token.');
+              googleFeedback('You’re signed in. Taking you to Studyloop…', 'success');
+              window.setTimeout(() => window.location.assign('index.html#find'), 400);
+            } catch (error) {
+              googleFeedback(error.message || 'Google sign-in failed. Please try again.');
+            }
+          }
+        });
+        window.google.accounts.id.renderButton(googleButton, {
+          type: 'standard',
+          theme: 'outline',
+          size: 'large',
+          text: 'continue_with',
+          shape: 'rectangular',
+          width: Math.min(360, Math.floor(googleButton.getBoundingClientRect().width || 360))
+        });
+      }
+
+      const googleScript = document.createElement('script');
+      googleScript.src = 'https://accounts.google.com/gsi/client';
+      googleScript.async = true;
+      googleScript.defer = true;
+      googleScript.onload = renderGoogleButton;
+      googleScript.onerror = () => googleFeedback('Google sign-in could not load. Please try again later.');
+      document.head.append(googleScript);
+    }
+  }
 })();

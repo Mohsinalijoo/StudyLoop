@@ -2,7 +2,9 @@
   'use strict';
 
   const apiMeta = document.querySelector('meta[name="studyloop-api-url"]');
-  const API_ORIGIN = (window.STUDYLOOP_API_URL || apiMeta?.content || 'http://localhost:4000').replace(/\/+$/, '');
+  const isLocalFrontend = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+  const defaultApiOrigin = isLocalFrontend ? 'http://localhost:4000' : (apiMeta?.content || 'https://studyloop-api-mmrq.onrender.com');
+  const API_ORIGIN = (window.STUDYLOOP_API_URL || defaultApiOrigin).replace(/\/+$/, '');
   const API_BASE = (window.STUDYLOOP_API_BASE || `${API_ORIGIN}/api`).replace(/\/+$/, '');
   let accessToken = null;
   let refreshPromise = null;
@@ -67,7 +69,7 @@
     return refreshPromise;
   }
 
-  const publicAuthPaths = new Set(['/auth/login', '/auth/signup', '/auth/register', '/auth/refresh', '/auth/logout']);
+  const publicAuthPaths = new Set(['/auth/login', '/auth/signup', '/auth/register', '/auth/google', '/auth/forgot-password', '/auth/reset-password', '/auth/refresh', '/auth/logout']);
 
   async function request(path, options = {}) {
     const { retryAuth = true, ...requestOptions } = options;
@@ -104,6 +106,20 @@
     return data;
   }
 
+  async function googleLogin(credential) {
+    const data = await request('/auth/google', { method: 'POST', body: { credential }, retryAuth: false });
+    accessToken = data?.accessToken || null;
+    return data;
+  }
+
+  async function forgotPassword(email) {
+    return request('/auth/forgot-password', { method: 'POST', body: { email }, retryAuth: false });
+  }
+
+  async function resetPassword(token, password) {
+    return request('/auth/reset-password', { method: 'POST', body: { token, password }, retryAuth: false });
+  }
+
   async function logout() {
     try {
       return await request('/auth/logout', { method: 'POST', retryAuth: false });
@@ -118,6 +134,9 @@
     request,
     login,
     register,
+    googleLogin,
+    forgotPassword,
+    resetPassword,
     refreshSession,
     logout,
     getAccessToken: () => accessToken,
