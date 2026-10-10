@@ -9,6 +9,8 @@
     const loginLink = document.getElementById('loginLink');
     const signupLink = document.getElementById('signupLink');
     const greeting = document.getElementById('authGreeting');
+    const streakBadge = document.getElementById('loginStreakBadge');
+    const streakSummary = document.getElementById('profileStreakSummary');
     const logoutButton = document.getElementById('logoutButton');
     const mobileLoginLink = document.getElementById('mobileLoginLink');
     if (!loginLink || !signupLink || !greeting || !logoutButton) return;
@@ -18,7 +20,18 @@
     if (mobileLoginLink) mobileLoginLink.hidden = Boolean(user);
     greeting.hidden = !user;
     logoutButton.hidden = !user;
+    if (streakBadge) streakBadge.hidden = !user;
     if (user) {
+      const streak = Math.max(0, Number(user.loginStreak) || 0);
+      if (streakBadge) {
+        streakBadge.textContent = `🔥 ${streak}`;
+        streakBadge.title = `${streak} consecutive daily logins`;
+        streakBadge.setAttribute('aria-label', `${streak} day login streak`);
+      }
+      if (streakSummary) {
+        const longest = Math.max(streak, Number(user.longestLoginStreak) || 0);
+        streakSummary.textContent = `🔥 Current login streak: ${streak} day${streak === 1 ? '' : 's'} · longest: ${longest} day${longest === 1 ? '' : 's'}`;
+      }
       greeting.textContent = `Hi, ${user.displayName}`;
       greeting.title = 'View and edit your Studyloop profile';
       greeting.setAttribute('aria-label', `Open profile for ${user.displayName}`);

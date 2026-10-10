@@ -13,7 +13,7 @@ export async function cacheRoomMember(roomId, userId) {
   multi.sAdd(activeRoomsKey, rid);
   multi.sAdd(activeRoomKey(rid), uid);
   multi.sAdd(activeUserRoomsKey(uid), rid);
-  multi.hSetNX(activeRoomMediaKey(rid), uid, JSON.stringify({ micEnabled: true, cameraEnabled: true }));
+  multi.hSetNX(activeRoomMediaKey(rid), uid, JSON.stringify({ micEnabled: false, cameraEnabled: false }));
   await multi.exec();
 }
 
@@ -38,6 +38,18 @@ export async function uncacheRoomMember(roomId, userId) {
 
 export async function getCachedRoomMembers(roomId) {
   return redis.sMembers(activeRoomKey(String(roomId)));
+}
+
+export async function getRoomMediaStates(roomId) {
+  const records = await redis.hGetAll(activeRoomMediaKey(String(roomId)));
+  return Object.fromEntries(Object.entries(records).map(([userId, raw]) => {
+    try {
+      const state = JSON.parse(raw);
+      return [userId, { micEnabled: Boolean(state.micEnabled), cameraEnabled: Boolean(state.cameraEnabled) }];
+    } catch {
+      return [userId, { micEnabled: false, cameraEnabled: false }];
+    }
+  }));
 }
 
 export async function ensureRoomMemberCache(roomId, userId) {

@@ -12,6 +12,7 @@ import { ChatMessage } from './models/ChatMessage.js';
 import { StudyNote } from './models/StudyNote.js';
 import { Flashcard } from './models/Flashcard.js';
 import { StudyRequest } from './models/StudyRequest.js';
+import { PlannerTask } from './models/PlannerTask.js';
 
 // Accept either export style so the server can start with named or default app exports.
 const app = appModule.app ?? appModule.default;
@@ -21,7 +22,7 @@ let httpServer;
 let shuttingDown = false;
 
 async function ensureIndexes() {
-  await Promise.all([User.createIndexes(), Room.createIndexes(), Session.createIndexes(), ChatMessage.createIndexes(), StudyNote.createIndexes(), Flashcard.createIndexes(), StudyRequest.createIndexes()]);
+  await Promise.all([User.createIndexes(), Room.createIndexes(), Session.createIndexes(), ChatMessage.createIndexes(), StudyNote.createIndexes(), Flashcard.createIndexes(), StudyRequest.createIndexes(), PlannerTask.createIndexes()]);
 }
 
 async function start() {

@@ -7,13 +7,14 @@
   <meta name="description" content="Find a study buddy who gets your goals. Meet students in your field and learn better, together.">
   <meta name="studyloop-api-url" content="https://studyloop-api-mmrq.onrender.com">
   <title>Studyloop — find your focus people</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20261010-1">
   <link rel="stylesheet" href="auth.css">
   <script src="api.js" defer></script>
-  <script src="auth.js" defer></script>
+  <script src="auth.js?v=20261010-1" defer></script>
   <script src="realtime.js" defer></script>
-  <script src="app.js?v=20261006-2" defer></script>
-  <script src="study-tools.js" defer></script>
+  <script src="app.js?v=20261010-1" defer></script>
+  <script src="study-tools.js?v=20261010-1" defer></script>
+  <script src="planner.js?v=20261010-1" defer></script>
 </head>
 <body class="auth-pending" data-auth-protected="true">
   <div class="auth-guard" id="authGuard" role="status" aria-live="polite">
@@ -38,12 +39,15 @@
         <a href="#requests">Requests <span class="nav-request-count" id="requestCountBadge" hidden>0</span></a>
         <a href="#rooms">Study rooms</a>
         <a href="#tools">Study tools</a>
+        <a href="#planner">Planner</a>
+        <a href="#leaderboard">Leaderboard</a>
         <a class="mobile-login-link" id="mobileLoginLink" href="login.html">Log in</a>
       </nav>
 
       <div class="header-actions">
         <a class="text-button login-button" id="loginLink" href="login.html">Log in</a>
         <a class="button button-primary button-small" id="signupLink" href="signup.html">Get started <span aria-hidden="true">↗</span></a>
+        <span class="login-streak-badge" id="loginStreakBadge" hidden></span>
         <button class="text-button auth-greeting" id="authGreeting" type="button" hidden></button>
         <button class="text-button logout-button" id="logoutButton" type="button" hidden>Log out</button>
         <button class="menu-toggle" id="menuToggle" type="button" aria-label="Open navigation menu" aria-expanded="false" aria-controls="mainNav">
@@ -191,7 +195,7 @@
         </details>
         <p class="rooms-status" id="roomsStatus" role="status" aria-live="polite">Loading active rooms…</p>
         <div class="room-grid" id="roomGrid" aria-live="polite"></div>
-        <div class="rooms-footnote"><span class="rooms-footnote-icon" aria-hidden="true">☼</span><span><strong>Real rooms, real members.</strong> Rooms close automatically when everyone leaves.</span><a href="#find">Prefer one-to-one? <span aria-hidden="true">→</span></a></div>
+        <div class="rooms-footnote"><span class="rooms-footnote-icon" aria-hidden="true">☼</span><span><strong>Rooms stay ready.</strong> Leaving never deletes a room; only its owner can close it.</span><a href="#find">Prefer one-to-one? <span aria-hidden="true">→</span></a></div>
       </div>
       <svg class="section-wave rooms-wave-bottom" viewBox="0 0 1440 110" preserveAspectRatio="none" aria-hidden="true"><path d="M0 49c236-37 400-16 591 6 235 28 383 27 567-7 98-18 185-18 282-3v65H0V49Z" fill="#f5f2fc"/></svg>
     </section>
@@ -207,7 +211,8 @@
           <article class="tool-card timer-card">
             <div class="tool-card-heading"><div class="tool-icon tool-icon-lilac" aria-hidden="true">◷</div><div><span class="tool-eyebrow">FOCUS TIMER</span><h3>One thing at a time.</h3></div><button class="tool-more" type="button" aria-label="Focus timer info" data-toast="A 25-minute focus sprint with a 5-minute break is ready to go.">···</button></div>
             <div class="timer-content"><div class="timer-ring" id="timerRing" style="--progress: 0"><div class="timer-inner"><span id="timerDisplay">25:00</span><small id="timerState">READY WHEN YOU ARE</small></div></div><div class="timer-actions"><button class="button button-primary timer-start" id="timerToggle" type="button">Start focus <span aria-hidden="true">→</span></button><button class="timer-reset" id="timerReset" type="button" aria-label="Reset focus timer">↺</button></div></div>
-            <div class="tool-footnote"><span class="tiny-dot tiny-dot-lilac"></span> 25 min focus <span class="footnote-divider">·</span> 5 min breathe</div>
+            <div class="timer-config"><label for="timerMinutes">Minutes<input id="timerMinutes" type="number" min="1" max="240" value="25" inputmode="numeric"></label><button class="timer-config-button" id="timerSetButton" type="button">Set</button><button class="timer-config-button timer-float-button" id="timerFloatButton" type="button">Float timer ↗</button></div>
+            <div class="tool-footnote"><span class="tiny-dot tiny-dot-lilac"></span> Set any focus sprint up to 240 min <span class="footnote-divider">·</span> drag the floating timer anywhere</div>
           </article>
 
           <article class="tool-card notes-card">
@@ -219,13 +224,14 @@
 
           <article class="tool-card flashcard-card">
             <div class="tool-card-heading"><div class="tool-icon tool-icon-mint" aria-hidden="true">✧</div><div><span class="tool-eyebrow">QUICK RECALL</span><h3>Make it stick.</h3></div><span class="card-counter" id="cardCounter" aria-live="polite">Loading…</span></div>
+            <label class="flashcard-topic-filter" for="flashcardTopicFilter">Topic<select id="flashcardTopicFilter"><option value="all">All topics</option></select></label>
             <button class="flashcard" id="flashcard" type="button" aria-label="Reveal flashcard answer" disabled>
               <span class="flashcard-label" id="flashcardLabel">YOUR DECK</span>
               <span class="flashcard-prompt" id="flashcardPrompt">Loading your saved cards…</span>
               <span class="flashcard-hint" id="flashcardHint">Cards are saved to your account</span>
             </button>
-            <div class="flashcard-bottom"><span id="flashcardStatus" aria-live="polite"><i class="tiny-dot tiny-dot-mint"></i> Saved to your account</span><div class="flashcard-actions"><button class="next-card" id="deleteFlashcard" type="button" disabled>Delete</button><button class="next-card" id="nextCard" type="button" disabled>Next card <span aria-hidden="true">→</span></button></div></div>
-            <details class="flashcard-create"><summary>Add a flashcard</summary><form id="flashcardForm" class="flashcard-form"><label class="sr-only" for="flashcardFront">Question or prompt</label><input id="flashcardFront" name="front" maxlength="500" placeholder="Question or prompt" required><label class="sr-only" for="flashcardBack">Answer</label><textarea id="flashcardBack" name="back" maxlength="1000" placeholder="Answer" required></textarea><button class="button button-primary" type="submit">Save card <span aria-hidden="true">→</span></button></form></details>
+            <div class="flashcard-bottom"><span id="flashcardStatus" aria-live="polite"><i class="tiny-dot tiny-dot-mint"></i> Saved to your account</span><div class="flashcard-actions"><button class="next-card" id="deleteFlashcard" type="button" disabled>Delete</button><button class="next-card" id="previousCard" type="button" disabled>← Previous</button><button class="next-card" id="nextCard" type="button" disabled>Next →</button></div></div>
+            <details class="flashcard-create"><summary>Add a flashcard</summary><form id="flashcardForm" class="flashcard-form"><label for="flashcardTopic">Topic<input id="flashcardTopic" name="topic" maxlength="60" placeholder="e.g. Algebra" value="General" required></label><label class="sr-only" for="flashcardFront">Question or prompt</label><input id="flashcardFront" name="front" maxlength="500" placeholder="Question or prompt" required><label class="sr-only" for="flashcardBack">Answer</label><textarea id="flashcardBack" name="back" maxlength="1000" placeholder="Answer" required></textarea><button class="button button-primary" type="submit">Save card <span aria-hidden="true">→</span></button></form></details>
           </article>
 
           <article class="tool-card board-card">
@@ -236,6 +242,44 @@
         </div>
       </div>
       <svg class="section-wave tools-wave-bottom" viewBox="0 0 1440 100" preserveAspectRatio="none" aria-hidden="true"><path d="M0 42c211 19 357 52 588 31 241-22 380-48 561-31 110 10 194 35 291 18v40H0V42Z" fill="#fff9f3"/></svg>
+    </section>
+
+    <section class="planner-section" id="planner" aria-labelledby="plannerTitle">
+      <div class="container">
+        <div class="section-heading planner-heading">
+          <div class="section-kicker"><span class="kicker-number">05</span> A LITTLE PLAN GOES A LONG WAY</div>
+          <div class="heading-row"><div><h2 id="plannerTitle">Your calendar, <em>your rhythm.</em></h2><p>Plan tasks, see your timetable, and set reminders for what matters.</p></div><span class="planner-reminder-note">Reminders notify you while Studyloop is open.</span></div>
+        </div>
+        <div class="planner-layout">
+          <section class="planner-calendar-card" aria-label="Monthly study calendar">
+            <div class="calendar-toolbar"><button class="calendar-month-arrow" id="calendarPrevMonth" type="button" aria-label="Previous month">←</button><h3 id="calendarMonthLabel">Month</h3><button class="calendar-month-arrow" id="calendarNextMonth" type="button" aria-label="Next month">→</button><button class="calendar-today-button" id="calendarToday" type="button">Today</button></div>
+            <div class="calendar-weekdays" aria-hidden="true"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+            <div class="calendar-grid" id="calendarGrid" role="grid" aria-label="Choose a date"></div>
+            <p class="calendar-status" id="plannerStatus" role="status" aria-live="polite">Loading your calendar…</p>
+          </section>
+          <section class="planner-agenda-card" aria-labelledby="agendaTitle">
+            <div class="agenda-heading"><div><span class="tool-eyebrow">DAY PLAN</span><h3 id="agendaTitle">Today's timetable</h3></div><span class="agenda-date-chip" id="selectedDateLabel"></span></div>
+            <form id="plannerTaskForm" class="planner-task-form">
+              <label>Task or study goal<input id="plannerTaskTitle" name="title" maxlength="120" placeholder="e.g. Review biology notes" required></label>
+              <div class="planner-form-row"><label>Date<input id="plannerTaskDate" name="date" type="date" required></label><label>Time, optional<input id="plannerTaskTime" name="startTime" type="time"></label></div>
+              <label>Details, optional<textarea id="plannerTaskDetails" name="details" maxlength="300" rows="2" placeholder="Add a small note"></textarea></label>
+              <label>Reminder, optional<input id="plannerReminderAt" name="reminderAt" type="datetime-local"></label>
+              <button class="button button-primary" id="plannerAddTask" type="submit">Add to calendar <span aria-hidden="true">→</span></button>
+            </form>
+            <div class="planner-task-list" id="plannerTaskList" aria-live="polite"><p class="planner-empty">Loading tasks…</p></div>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <section class="leaderboard-section" id="leaderboard" aria-labelledby="leaderboardTitle">
+      <div class="container">
+        <div class="section-heading leaderboard-heading">
+          <div class="section-kicker"><span class="kicker-number">06</span> SHOW UP, GROW TOGETHER</div>
+          <div class="heading-row"><div><h2 id="leaderboardTitle">The focus <em>leaderboard.</em></h2><p>Top five students by time spent in active Studyloop sessions, with their daily login streaks.</p></div><button class="button button-outline" id="refreshLeaderboard" type="button">Refresh ranks ↻</button></div>
+        </div>
+        <div class="leaderboard-card"><div class="leaderboard-table-heading"><span>RANK & STUDENT</span><span>STUDY TIME</span><span>LOGIN STREAK</span></div><ol class="leaderboard-list" id="leaderboardList"><li class="leaderboard-loading">Loading the focus leaderboard…</li></ol><p class="leaderboard-status" id="leaderboardStatus" role="status" aria-live="polite"></p></div>
+      </div>
     </section>
 
     <section class="closing-section" aria-labelledby="closingTitle">
@@ -258,7 +302,7 @@
         <div class="contact-methods" aria-label="Contact Mohsin Ali">
           <a class="contact-method" href="https://mail.google.com/mail/?view=cm&amp;fs=1&amp;to=mohsinalijoo%40gmail.com" target="_blank" rel="noopener noreferrer">
             <span class="contact-method-icon" aria-hidden="true">@</span>
-            <span class="contact-method-copy"><span class="contact-method-label">EMAIL</span><strong><span class="__cf_email__" data-cfemail="076a686f746e69666b6e6d686847606a666e6b2964686a">mohsinalijoo@gmail.com</span></strong></span>
+            <span class="contact-method-copy"><span class="contact-method-label">EMAIL</span><strong><span class="__cf_email__" data-cfemail="04696b6c776d6a65686d6e6b6b446369656d682a676b69">[email&#160;protected]</span></strong></span>
             <span class="contact-method-arrow" aria-hidden="true">↗</span>
           </a>
           <a class="contact-method" href="https://www.linkedin.com/in/mohsinalijoo/" target="_blank" rel="noopener noreferrer">
@@ -282,7 +326,8 @@
 
   <div class="modal-backdrop" id="callModal" hidden>
     <section class="modal-panel call-modal" role="dialog" aria-modal="true" aria-labelledby="callModalTitle">
-      <div class="modal-header"><div><div class="modal-overline"><span class="live-dot"></span> LIVE STUDY SPACE</div><h2 id="callModalTitle">Your study room</h2><p id="callSubtitle">Join a match or room to begin</p><div class="call-room-id"><span>ROOM ID <code id="callRoomId"></code></span><button class="call-room-id-copy" id="copyCallRoomId" type="button" data-copy-room-id="">Copy ID</button></div></div><button class="modal-close" type="button" data-close-modal aria-label="Close study session">×</button></div>
+      <div class="modal-header call-modal-header"><div><div class="modal-overline"><span class="live-dot"></span> LIVE STUDY SPACE</div><h2 id="callModalTitle">Your study room</h2><p id="callSubtitle">Join a match or room to begin</p><div class="call-room-id"><span>ROOM ID <code id="callRoomId"></code></span><button class="call-room-id-copy" id="copyCallRoomId" type="button" data-copy-room-id="">Copy ID</button></div></div><div class="call-header-actions"><button class="call-header-button" id="deleteRoomButton" type="button" hidden>Delete room</button><button class="call-header-button" id="fullscreenSessionButton" type="button">Full screen</button><button class="call-header-button" id="minimizeSessionButton" type="button">Minimize</button><button class="modal-close" type="button" data-minimize-session aria-label="Minimize study session">×</button></div></div>
+      <div class="session-request-panel" id="roomJoinRequestsPanel" role="region" aria-label="Room join requests" hidden><div class="session-request-heading"><strong>Someone wants to join</strong><span id="roomJoinRequestCount">0 requests</span></div><div class="session-request-list" id="roomJoinRequests"></div></div>
       <div class="call-layout">
         <div class="call-main-column">
           <div class="call-stage" id="callStage">
@@ -299,6 +344,7 @@
           <p class="demo-disclaimer">Allow browser access when prompted. Audio and video stream directly between room members; turn either control on or off at any time.</p>
         </div>
         <aside class="call-sidebar chat-sidebar" aria-label="Study session chat">
+          <section class="session-members-panel" aria-labelledby="sessionMembersTitle"><div class="session-members-heading"><h3 id="sessionMembersTitle">In this session</h3><span id="sessionMemberCount">0</span></div><ul class="session-members-list" id="sessionMembersList"></ul></section>
           <div class="chat-panel-heading">
             <div class="chat-peer-avatar avatar avatar-lavender" id="chatPeerAvatar" aria-hidden="true">S</div>
             <div class="chat-heading-copy"><h3 id="chatTitle">Study session chat</h3><p id="chatSubtitle">Join a study room to chat</p></div>
@@ -327,6 +373,7 @@
         </div>
         <label for="profileSubjects">Study fields<textarea id="profileSubjects" name="subjects" rows="2" required placeholder="Mathematics, Biology"></textarea></label>
         <span class="profile-field-hint">Separate subjects with commas or new lines. Choose 1–10 fields.</span>
+        <p class="profile-streak-summary" id="profileStreakSummary">🔥 Your login streak is loading…</p>
         <label for="profileBio">Short bio<textarea id="profileBio" name="bio" rows="3" maxlength="300" placeholder="What are you working toward?"></textarea></label>
         <label for="profileTimezone">Time zone<input id="profileTimezone" name="timezone" type="text" maxlength="80" placeholder="e.g. Asia/Kolkata"></label>
         <p class="profile-feedback" id="profileFeedback" role="status" aria-live="polite" hidden></p>
@@ -342,12 +389,14 @@
   <div class="modal-backdrop" id="boardModal" hidden>
     <section class="modal-panel board-modal" role="dialog" aria-modal="true" aria-labelledby="boardTitle">
       <div class="modal-header board-modal-header"><div><div class="modal-overline">PRIVATE STUDY TOOL</div><h2 id="boardTitle">Sketch it out.</h2><p>A browser-only canvas for the messy first draft of an idea; drawings are not synced.</p></div><button class="modal-close" type="button" data-close-modal aria-label="Close whiteboard">×</button></div>
-      <div class="board-toolbar"><div class="brush-colors" role="group" aria-label="Brush colour"><button type="button" class="color-swatch swatch-ink selected" data-color="#293451" aria-label="Dark ink" aria-pressed="true"></button><button type="button" class="color-swatch swatch-violet" data-color="#7868e8" aria-label="Violet ink" aria-pressed="false"></button><button type="button" class="color-swatch swatch-coral" data-color="#ef8e70" aria-label="Coral ink" aria-pressed="false"></button><button type="button" class="color-swatch swatch-mint" data-color="#58ad8c" aria-label="Green ink" aria-pressed="false"></button></div><span class="board-tip">Click and drag to draw</span><button class="clear-board" id="clearBoard" type="button">Clear canvas <span aria-hidden="true">↺</span></button></div>
+      <div class="board-toolbar"><div class="board-tool-buttons" role="group" aria-label="Drawing tool"><button class="board-tool-button is-active" type="button" data-board-tool="pen" aria-pressed="true">Pen</button><button class="board-tool-button" type="button" data-board-tool="eraser" aria-pressed="false">Eraser</button><button class="board-tool-button" type="button" id="undoBoard" disabled>Undo</button></div><div class="brush-colors" role="group" aria-label="Brush colour"><button type="button" class="color-swatch swatch-ink selected" data-color="#293451" aria-label="Dark ink" aria-pressed="true"></button><button type="button" class="color-swatch swatch-violet" data-color="#7868e8" aria-label="Violet ink" aria-pressed="false"></button><button type="button" class="color-swatch swatch-coral" data-color="#ef8e70" aria-label="Coral ink" aria-pressed="false"></button><button type="button" class="color-swatch swatch-mint" data-color="#58ad8c" aria-label="Green ink" aria-pressed="false"></button></div><label class="board-size-label" for="boardBrushSize">Size<input id="boardBrushSize" type="range" min="2" max="32" value="5"><output id="boardBrushSizeValue">5</output></label><span class="board-tip">Draw with a mouse, pen, or touch</span><button class="clear-board" id="clearBoard" type="button">Clear <span aria-hidden="true">↺</span></button></div>
       <canvas id="whiteboard" width="1200" height="620" aria-label="Interactive whiteboard drawing area"></canvas>
       <div class="board-modal-foot"><span><span class="tiny-dot tiny-dot-lilac"></span> Browser-only canvas · drawings are not synced</span><button class="button button-primary" type="button" data-close-modal>Done <span aria-hidden="true">✓</span></button></div>
     </section>
   </div>
 
+  <aside class="session-dock" id="sessionDock" hidden aria-label="Active study session"><button class="session-dock-open" id="sessionDockOpen" type="button"><span class="dock-live-dot"></span><span class="session-dock-title" id="sessionDockTitle">Active study session</span><span class="session-dock-action">Open ↗</span></button><button class="session-dock-leave" id="sessionDockLeave" type="button" aria-label="Leave study session">Leave</button></aside>
+  <aside class="floating-timer" id="floatingTimer" hidden aria-label="Floating focus timer"><div class="floating-timer-head" id="floatingTimerDrag"><strong>Focus timer</strong><button id="closeFloatingTimer" type="button" aria-label="Close floating timer">×</button></div><div class="floating-timer-display" id="floatingTimerDisplay">25:00</div><div class="floating-timer-state" id="floatingTimerState">Ready</div><div class="floating-timer-actions"><button id="floatingTimerToggle" type="button">Start</button><button id="floatingTimerReset" type="button">Reset</button></div></aside>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4653edfc87425d9',t:'MTc5MTI5NTc4NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4844efadd562d70',t:'MTc5MTYyMTUwMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>

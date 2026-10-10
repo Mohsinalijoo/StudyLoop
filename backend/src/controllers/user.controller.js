@@ -6,10 +6,12 @@ import { publicUser } from '../utils/serializers.js';
 import { isUserOnline, onlineStatuses, onlineUserIds } from '../services/presence.service.js';
 import { cancelMatch } from '../services/matchmaking.service.js';
 import { permanentlyDeleteAccount } from '../services/account-deletion.service.js';
+import { markLoginStreak } from '../services/streak.service.js';
 import { env } from '../config/env.js';
 
 export const getMe = asyncHandler(async (req, res) => {
-  res.json({ data: { user: publicUser(req.user, await isUserOnline(req.auth.userId)) } });
+  const user = await markLoginStreak(req.auth.userId);
+  res.json({ data: { user: publicUser(user || req.user, await isUserOnline(req.auth.userId)) } });
 });
 
 export const updateMe = asyncHandler(async (req, res) => {

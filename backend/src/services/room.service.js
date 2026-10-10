@@ -3,6 +3,7 @@ import { env } from '../config/env.js';
 import { redis } from '../config/redis.js';
 import { Room } from '../models/Room.js';
 import { Session } from '../models/Session.js';
+import { StudyRequest } from '../models/StudyRequest.js';
 import { AppError } from '../utils/AppError.js';
 import { normalizeSubject } from '../utils/validation.js';
 import { cacheRoomMember, uncacheRoomMember, ensureRoomMemberCache, activeRoomMediaKey } from './presence.room-cache.js';
@@ -137,17 +138,45 @@ export async function leaveRoom({ roomId, userId }) {
         await sessionRecord.save({ session: tx });
       }
       room.members.pull(userId);
-      const roomClosed = room.members.length === 0;
-      if (roomClosed) {
-        room.status = 'closed';
-        room.closedAt = leftAt;
-      }
+      // Leaving ends this member's study session, not the room itself.
+      // Only the room owner can close a room via deleteRoom().
       await room.save({ session: tx });
-      return { room, left: true, roomClosed, leftAt, durationSeconds, session: sessionRecord };
+      return { room, left: true, roomClosed: false, leftAt, durationSeconds, session: sessionRecord };
     });
 
     await uncacheRoomMember(roomId, userId);
     return result;
+  });
+}
+
+export async function deleteRoom({ roomId, userId }) {
+  return withDistributedLock(`lock:room:${roomId}`, async () => {
+    const closed = await withMongoTransaction(async (tx) => {
+      const room = await Room.findById(roomId).session(tx);
+      if (!room || room.status !== 'active') throw new AppError(404, 'ROOM_NOT_FOUND', 'Active room not found');
+      if (!sameId(room.host, userId)) throw new AppError(403, 'ROOM_OWNER_REQUIRED', 'Only the room owner can delete this room');
+
+      const memberIds = room.members.map((memberId) => String(memberId));
+      const closedAt = new Date();
+      const openSessions = await Session.find({ roomId, leftAt: null }).session(tx);
+      for (const sessionRecord of openSessions) {
+        sessionRecord.leftAt = closedAt;
+        sessionRecord.durationSeconds = Math.max(0, Math.floor((closedAt.getTime() - sessionRecord.joinedAt.getTime()) / 1000));
+        await sessionRecord.save({ session: tx });
+      }
+
+      room.status = 'closed';
+      room.closedAt = closedAt;
+      room.members = [];
+      await room.save({ session: tx });
+      await StudyRequest.updateMany({ kind: 'room', roomId, status: 'pending' }, {
+        $set: { status: 'declined', respondedAt: closedAt }
+      }, { session: tx });
+      return { room, memberIds, closedAt };
+    });
+
+    await Promise.allSettled(closed.memberIds.map((memberId) => uncacheRoomMember(roomId, memberId)));
+    return closed;
   });
 }
 
@@ -162,7 +191,7 @@ export async function updateRoomGoal({ roomId, userId, goal }) {
 export async function setRoomMediaState({ roomId, userId, field, enabled }) {
   const key = activeRoomMediaKey(roomId);
   const raw = await redis.hGet(key, String(userId));
-  let state = { micEnabled: true, cameraEnabled: true };
+  let state = { micEnabled: false, cameraEnabled: false };
   if (raw) {
     try { state = { ...state, ...JSON.parse(raw) }; } catch { /* replace invalid cache state */ }
   }
@@ -185,7 +214,7 @@ export async function canAccessRoom({ roomId, userId }) {
 export async function listActiveRooms({ subject, limit = 20, userId }) {
   const filter = {
     status: 'active',
-    $or: [{ type: 'group' }, { type: 'pair', members: userId }]
+    $or: [{ type: 'group' }, { type: 'pair', participantIds: userId }]
   };
   if (subject) filter.subjectKey = normalizeSubject(subject);
   return Room.find(filter).sort({ createdAt: -1 }).limit(limit)
@@ -196,7 +225,7 @@ export async function listActiveRooms({ subject, limit = 20, userId }) {
 export async function getRoom(roomId, userId) {
   const room = await Room.findOne({
     _id: roomId,
-    $or: [{ type: 'group' }, { type: 'pair', members: userId }]
+    $or: [{ type: 'group' }, { type: 'pair', participantIds: userId }]
   }).populate('members', 'displayName subjects availability').lean();
   if (!room) throw new AppError(404, 'ROOM_NOT_FOUND', 'Room not found');
   return room;

@@ -11,6 +11,7 @@ function noteDto(note) {
 function flashcardDto(card) {
   return {
     id: String(card._id),
+    topic: card.topic || 'General',
     front: card.front,
     back: card.back,
     createdAt: card.createdAt,
@@ -43,9 +44,10 @@ export const listFlashcards = asyncHandler(async (req, res) => {
 
 export const createFlashcard = asyncHandler(async (req, res) => {
   const body = req.body || {};
+  const topic = body.topic === undefined ? 'General' : requireString(body.topic, 'topic', { min: 1, max: 60 });
   const front = requireString(body.front, 'front', { min: 1, max: 500 });
   const back = requireString(body.back, 'back', { min: 1, max: 1000 });
-  const card = await Flashcard.create({ userId: req.auth.userId, front, back });
+  const card = await Flashcard.create({ userId: req.auth.userId, topic, front, back });
   res.status(201).json({ data: { flashcard: flashcardDto(card) } });
 });
 

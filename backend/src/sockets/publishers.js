@@ -21,6 +21,13 @@ export function publishRoomJoin({ roomId, user, session, room }) {
   });
 }
 
+export function publishRoomClosed({ roomId, closedAt }) {
+  getSocketServer().to(studySocketRoom(roomId)).emit('room:closed', {
+    roomId: String(roomId),
+    closedAt: closedAt || new Date().toISOString()
+  });
+}
+
 export function publishRoomLeave({ roomId, userId, leftAt, durationSeconds, roomClosed, memberCount }) {
   const io = getSocketServer();
   const channel = studySocketRoom(roomId);

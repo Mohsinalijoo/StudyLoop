@@ -6,7 +6,9 @@ export function publicUser(user, online = undefined) {
     subjects: user.subjects || [],
     availability: user.availability,
     timezone: user.timezone || null,
-    bio: user.bio || ''
+    bio: user.bio || '',
+    loginStreak: Number(user.loginStreak || 0),
+    longestLoginStreak: Number(user.longestLoginStreak || 0)
   };
   if (online !== undefined) result.online = Boolean(online);
   return result;

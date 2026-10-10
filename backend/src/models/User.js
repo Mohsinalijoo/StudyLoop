@@ -10,6 +10,9 @@ const userSchema = new mongoose.Schema({
   availability: { type: String, enum: ['now', 'later', 'flexible'], default: 'flexible', index: true },
   timezone: { type: String, trim: true, maxlength: 80, default: '' },
   bio: { type: String, trim: true, maxlength: 300, default: '' },
+  loginStreak: { type: Number, min: 0, default: 0 },
+  longestLoginStreak: { type: Number, min: 0, default: 0 },
+  lastLoginDate: { type: String, match: /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/, default: '' },
   isDisabled: { type: Boolean, default: false, index: true }
 }, {
   timestamps: true,

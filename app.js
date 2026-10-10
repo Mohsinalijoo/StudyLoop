@@ -6,6 +6,7 @@
   const realtime = window.StudyloopRealtime;
   const toast = document.getElementById('toast');
   const callModal = document.getElementById('callModal');
+  const sessionDock = document.getElementById('sessionDock');
   const boardModal = document.getElementById('boardModal');
   const profileModal = document.getElementById('profileModal');
   const studentGrid = document.getElementById('studentGrid');
@@ -83,6 +84,7 @@
   function openModal(modal) {
     if (!modal) return;
     if (activeModal && activeModal !== modal) activeModal.hidden = true;
+    if (modal === callModal && sessionDock) sessionDock.hidden = true;
     lastFocusedElement = document.activeElement;
     activeModal = modal;
     modal.hidden = false;
@@ -97,6 +99,24 @@
     activeModal = null;
     document.body.classList.remove('modal-open');
     if (lastFocusedElement && typeof lastFocusedElement.focus === 'function') lastFocusedElement.focus();
+  }
+
+  function minimizeCallSession() {
+    if (!activeSession) {
+      closeModal();
+      return;
+    }
+    callModal.hidden = true;
+    if (activeModal === callModal) activeModal = null;
+    document.body.classList.remove('modal-open');
+    sessionDock.hidden = false;
+    const title = activeSession.room?.title || 'Active study session';
+    document.getElementById('sessionDockTitle').textContent = title;
+  }
+
+  function restoreCallSession() {
+    if (!activeSession) return;
+    openModal(callModal);
   }
 
   function openBoard() { openModal(boardModal); }
@@ -225,9 +245,50 @@
 
   function roomMember(member) {
     if (member && typeof member === 'object') {
-      return { id: String(member.id || member._id || ''), name: member.displayName || 'Studyloop member' };
+      return { id: String(member.id || member._id || ''), name: member.displayName || member.name || 'Studyloop member' };
     }
     return { id: String(member || ''), name: 'Studyloop member' };
+  }
+
+  function renderSessionMembers() {
+    const list = document.getElementById('sessionMembersList');
+    const count = document.getElementById('sessionMemberCount');
+    if (!list || !count) return;
+    if (!activeSession) {
+      list.replaceChildren();
+      count.textContent = '0';
+      return;
+    }
+    const membersById = new Map();
+    membersById.set(String(currentUser.id), { id: String(currentUser.id), name: currentUser.displayName || 'You' });
+    for (const member of activeSession.participants || []) {
+      const normalized = roomMember(member);
+      if (normalized.id) membersById.set(normalized.id, normalized);
+    }
+    const members = [...membersById.values()];
+    count.textContent = String(members.length);
+    list.innerHTML = members.map((member) => {
+      const self = member.id === String(currentUser.id);
+      const state = self
+        ? { micEnabled: currentMicOn, cameraEnabled: currentCameraOn }
+        : (activeSession.mediaStates?.[member.id] || { micEnabled: false, cameraEnabled: false });
+      return `<li class="session-member-row"><span class="avatar session-member-avatar ${avatarFor(member.id)}">${escapeHTML(initialsFor(member.name))}</span><span class="session-member-name">${escapeHTML(member.name)}${self ? ' <small>(you)</small>' : ''}</span><span class="member-media-pill ${state.micEnabled ? 'is-on' : ''}" title="Microphone ${state.micEnabled ? 'on' : 'off'}">${state.micEnabled ? '🎙 Mic on' : 'Mic off'}</span><span class="member-media-pill ${state.cameraEnabled ? 'is-on' : ''}" title="Camera ${state.cameraEnabled ? 'on' : 'off'}">${state.cameraEnabled ? '▣ Cam on' : 'Cam off'}</span></li>`;
+    }).join('');
+  }
+
+  function renderRoomJoinRequests() {
+    const panel = document.getElementById('roomJoinRequestsPanel');
+    const list = document.getElementById('roomJoinRequests');
+    const count = document.getElementById('roomJoinRequestCount');
+    if (!panel || !list || !count) return;
+    const isOwner = activeSession?.room?.type === 'group' && activeSession.room.hostId === currentUser?.id;
+    const requests = isOwner
+      ? (currentStudyRequests.incoming || []).filter((request) => request.kind === 'room'
+        && request.status === 'pending' && request.roomId === activeSession.roomId)
+      : [];
+    panel.hidden = requests.length === 0;
+    count.textContent = `${requests.length} ${requests.length === 1 ? 'request' : 'requests'}`;
+    list.innerHTML = requests.map(renderIncomingStudyRequest).join('');
   }
 
   function renderRoom(room, index) {
@@ -347,6 +408,7 @@
       ? outgoing.map(renderOutgoingStudyRequest).join('')
       : '<p class="request-empty">You have not sent any study requests yet.</p>';
     renderStudents();
+    renderRoomJoinRequests();
   }
 
   async function loadStudyRequests() {
@@ -611,11 +673,14 @@
       if (kind === 'audio' && localAudioTrack === track) {
         currentMicOn = false;
         updateCallControl(document.getElementById('micControl'), false, 'Mic on');
+        void sendMediaToggle('mic_toggle', false).catch(() => {});
       }
       if (kind === 'video' && localVideoTrack === track) {
         currentCameraOn = false;
         updateCallControl(document.getElementById('cameraControl'), false, 'Camera on');
+        void sendMediaToggle('camera_toggle', false).catch(() => {});
       }
+      renderSessionMembers();
       updateSelfMediaPreview();
     }, { once: true });
 
@@ -673,8 +738,16 @@
   function updateRemoteMediaState(peerId, kind, enabled) {
     const tile = ensureRemoteTile(peerId);
     if (!tile) return;
-    if (kind === 'audio') tile.micEnabled = enabled;
-    else tile.cameraEnabled = enabled;
+    activeSession.mediaStates ||= {};
+    activeSession.mediaStates[peerId] ||= { micEnabled: false, cameraEnabled: false };
+    if (kind === 'audio') {
+      tile.micEnabled = enabled;
+      activeSession.mediaStates[peerId].micEnabled = enabled;
+    } else {
+      tile.cameraEnabled = enabled;
+      activeSession.mediaStates[peerId].cameraEnabled = enabled;
+    }
+    renderSessionMembers();
     const parts = [];
     if (tile.micEnabled !== null) parts.push(tile.micEnabled ? 'Mic on' : 'Muted');
     if (tile.cameraEnabled !== null) parts.push(tile.cameraEnabled ? 'Camera on' : 'Camera off');
@@ -855,6 +928,9 @@
     const existing = activeSession.participants.find((item) => item.id === participant.id);
     if (existing) existing.name = participant.name;
     else activeSession.participants.push(participant);
+    activeSession.mediaStates ||= {};
+    activeSession.mediaStates[participant.id] ||= { micEnabled: false, cameraEnabled: false };
+    renderSessionMembers();
     ensurePeerConnection(participant.id);
   }
 
@@ -864,20 +940,27 @@
     button.querySelector('.control-label').textContent = isOn ? label : `${label.replace(/ on$/i, '')} off`;
   }
 
-  async function openStudySession(room, participants = []) {
+  async function openStudySession(room, participants = [], mediaStates = {}) {
     if (!room?.id) {
       showToast('The server did not return a valid study room.');
       return;
     }
-    if (activeSession?.roomId === room.id && !callModal.hidden) return;
-    if (activeSession && activeSession.roomId !== room.id) cleanupSessionMedia();
+    if (activeSession?.roomId === room.id) {
+      if (callModal.hidden) restoreCallSession();
+      return;
+    }
+    if (activeSession) await leaveActiveSession();
 
     const members = participants.length ? participants.map(roomMember) : (room.members || []).map(roomMember);
     const partner = members.find((member) => member.id && member.id !== currentUser.id);
     const isGroup = room.type === 'group';
     const roomTitle = room.title || 'Study room';
     const subject = room.subject || 'Study session';
-    activeSession = { roomId: room.id, room, participants: members };
+    const normalizedMedia = { ...(mediaStates || {}) };
+    for (const member of members) {
+      if (member.id && !normalizedMedia[member.id]) normalizedMedia[member.id] = { micEnabled: false, cameraEnabled: false };
+    }
+    activeSession = { roomId: room.id, room, participants: members, mediaStates: normalizedMedia };
 
     document.getElementById('callModalTitle').textContent = isGroup ? roomTitle : 'Your 1:1 study session';
     document.getElementById('callSubtitle').textContent = `${subject} · ${isGroup ? `${room.memberCount || members.length} person group room` : 'one-to-one study room'}`;
@@ -900,6 +983,8 @@
     document.getElementById('goalStatus').textContent = room.goal ? 'Shared with active room members.' : 'Add a goal for everyone in this room.';
     document.getElementById('chatMessages').replaceChildren();
     document.getElementById('chatPreviewNote').textContent = 'Messages are saved to this study room.';
+    document.getElementById('deleteRoomButton').hidden = !(isGroup && room.hostId === currentUser.id);
+    document.getElementById('sessionDockTitle').textContent = roomTitle;
 
     currentCameraOn = false;
     currentMicOn = false;
@@ -907,6 +992,8 @@
     updateCallControl(document.getElementById('cameraControl'), false, 'Camera on');
     updateCallControl(document.getElementById('micControl'), false, 'Mic on');
     updateSelfMediaPreview();
+    renderSessionMembers();
+    renderRoomJoinRequests();
     for (const member of members) {
       try { ensurePeerConnection(member.id); }
       catch (error) {
@@ -926,7 +1013,7 @@
     try {
       const result = await api.request(`/rooms/${encodeURIComponent(roomId)}`);
       if (!result?.room?.id) throw new Error('The server returned no room details. Check the API logs and try again.');
-      await openStudySession(result.room);
+      await openStudySession(result.room, [], result.mediaStates || {});
     } catch (error) {
       reportError(error);
     }
@@ -1065,8 +1152,38 @@
       reportError(error);
     } finally {
       activeSession = null;
-      closeModal();
+      sessionDock.hidden = true;
+      if (document.fullscreenElement === callModal) void document.exitFullscreen?.().catch(() => {});
+      if (activeModal === callModal) closeModal();
+      else callModal.hidden = true;
       void loadRooms();
+    }
+  }
+
+  async function deleteActiveRoom() {
+    const room = activeSession?.room;
+    if (!room || room.hostId !== currentUser.id) return;
+    if (!window.confirm(`Delete “${room.title || 'this room'}” for everyone? This cannot be undone.`)) return;
+    const roomId = activeSession.roomId;
+    const button = document.getElementById('deleteRoomButton');
+    button.disabled = true;
+    button.textContent = 'Deleting…';
+    try {
+      await api.request(`/rooms/${encodeURIComponent(roomId)}`, { method: 'DELETE' });
+      if (activeSession?.roomId === roomId) {
+        cleanupSessionMedia();
+        activeSession = null;
+      }
+      sessionDock.hidden = true;
+      if (document.fullscreenElement === callModal) await document.exitFullscreen().catch(() => {});
+      if (activeModal === callModal) closeModal();
+      else callModal.hidden = true;
+      showToast('Room deleted. Members have been notified.');
+      await Promise.all([loadRooms(), loadStudyRequests()]);
+    } catch (error) {
+      reportError(error);
+      button.disabled = false;
+      button.textContent = 'Delete room';
     }
   }
 
@@ -1113,11 +1230,14 @@
       if (userId !== currentUser.id) {
         closePeerConnection(String(userId));
         activeSession.participants = activeSession.participants.filter((member) => member.id !== String(userId));
+        delete activeSession.mediaStates?.[String(userId)];
+        renderSessionMembers();
         showToast('A study partner left the room.');
       }
       if (roomClosed) {
         cleanupSessionMedia();
         activeSession = null;
+        sessionDock.hidden = true;
         closeModal();
       }
       void loadRooms();
@@ -1126,8 +1246,9 @@
       if (activeSession?.roomId === roomId) {
         cleanupSessionMedia();
         activeSession = null;
+        sessionDock.hidden = true;
         closeModal();
-        showToast('This study room has closed.');
+        showToast('This study room has been deleted by its owner.');
       }
       void loadRooms();
     });
@@ -1181,6 +1302,7 @@
       if (isAudio) currentMicOn = next;
       else currentCameraOn = next;
       updateCallControl(button, next, label);
+      renderSessionMembers();
       updateSelfMediaPreview();
       try { await sendMediaToggle(eventName, next); }
       catch (error) { reportError(error); }
@@ -1390,6 +1512,11 @@
         void copyRoomId(copyButton);
         return;
       }
+      const requestButton = event.target.closest('button[data-request-action]');
+      if (requestButton && !requestButton.disabled) {
+        void respondToStudyRequest(requestButton.dataset.requestId, requestButton.dataset.requestAction, requestButton);
+        return;
+      }
       const button = event.target.closest('button[data-room-action]');
       if (!button || button.disabled) return;
       if (button.dataset.roomAction === 'open-room') void joinRoom(button.dataset.roomId, button);
@@ -1398,6 +1525,20 @@
     roomGrid.addEventListener('click', handleRoomCardClick);
     roomSearchResult.addEventListener('click', handleRoomCardClick);
     callModal.addEventListener('click', handleRoomCardClick);
+    callModal.addEventListener('click', (event) => {
+      if (event.target.closest('[data-minimize-session]')) minimizeCallSession();
+    });
+    document.getElementById('minimizeSessionButton').addEventListener('click', minimizeCallSession);
+    document.getElementById('sessionDockOpen').addEventListener('click', restoreCallSession);
+    document.getElementById('sessionDockLeave').addEventListener('click', () => void leaveActiveSession());
+    document.getElementById('deleteRoomButton').addEventListener('click', () => void deleteActiveRoom());
+    document.getElementById('fullscreenSessionButton').addEventListener('click', async () => {
+      try {
+        if (document.fullscreenElement === callModal) await document.exitFullscreen();
+        else if (callModal.requestFullscreen) await callModal.requestFullscreen();
+        else showToast('Full-screen mode is not available in this browser.');
+      } catch { showToast('The browser did not allow full-screen mode.'); }
+    });
     roomLookupForm.addEventListener('submit', (event) => {
       event.preventDefault();
       void lookupRoomById(roomLookupForm.elements.roomId.value);
@@ -1436,13 +1577,13 @@
     [callModal, boardModal, profileModal].forEach((modal) => {
       modal.addEventListener('mousedown', (event) => {
         if (event.target !== modal) return;
-        if (modal === callModal) void leaveActiveSession();
+        if (modal === callModal) minimizeCallSession();
         else closeModal();
       });
     });
     document.addEventListener('keydown', (event) => {
       if (event.key !== 'Escape' || !activeModal) return;
-      if (activeModal === callModal) void leaveActiveSession();
+      if (activeModal === callModal) minimizeCallSession();
       else closeModal();
     });
 

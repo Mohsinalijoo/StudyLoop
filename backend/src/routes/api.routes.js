@@ -6,6 +6,8 @@ import matchmakingRoutes from './matchmaking.routes.js';
 import sessionRoutes from './session.routes.js';
 import studyToolsRoutes from './study-tools.routes.js';
 import studyRequestRoutes from './study-request.routes.js';
+import plannerRoutes from './planner.routes.js';
+import statsRoutes from './stats.routes.js';
 
 const router = Router();
 router.use('/auth', authRoutes);
@@ -15,5 +17,7 @@ router.use('/matchmaking', matchmakingRoutes);
 router.use('/sessions', sessionRoutes);
 router.use('/study-tools', studyToolsRoutes);
 router.use('/study-requests', studyRequestRoutes);
+router.use('/planner', plannerRoutes);
+router.use('/stats', statsRoutes);
 
 export default router;

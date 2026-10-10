@@ -5,6 +5,7 @@ import { ChatMessage } from '../models/ChatMessage.js';
 import { StudyNote } from '../models/StudyNote.js';
 import { Flashcard } from '../models/Flashcard.js';
 import { StudyRequest } from '../models/StudyRequest.js';
+import { PlannerTask } from '../models/PlannerTask.js';
 import { cancelMatch } from './matchmaking.service.js';
 import { currentActiveRooms, leaveRoom } from './room.service.js';
 import { revokeAllRefreshTokens } from './token.service.js';
@@ -64,6 +65,7 @@ export async function permanentlyDeleteAccount(userId) {
     Session.deleteMany({ userId: user._id }),
     StudyNote.deleteMany({ userId: user._id }),
     Flashcard.deleteMany({ userId: user._id }),
+    PlannerTask.deleteMany({ userId: user._id }),
     StudyRequest.deleteMany({ $or: [{ fromUserId: user._id }, { toUserId: user._id }] })
   ]);
 

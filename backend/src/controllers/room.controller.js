@@ -1,10 +1,11 @@
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { parseLimit, requireObjectId, requireString } from '../utils/validation.js';
-import { createGroupRoom, joinRoom, leaveRoom, getRoom, listActiveRooms } from '../services/room.service.js';
+import { createGroupRoom, joinRoom, leaveRoom, deleteRoom as deleteRoomService, getRoom, listActiveRooms } from '../services/room.service.js';
+import { getRoomMediaStates } from '../services/presence.room-cache.js';
 import { getRoomMessages } from '../services/message.service.js';
 import { roomDto, publicUser } from '../utils/serializers.js';
 import { isUserOnline } from '../services/presence.service.js';
-import { attachUserSocketsToRoom, detachUserSocketsFromRoom, publishRoomJoin, publishRoomLeave } from '../sockets/publishers.js';
+import { attachUserSocketsToRoom, detachUserSocketsFromRoom, publishRoomClosed, publishRoomJoin, publishRoomLeave } from '../sockets/publishers.js';
 
 export const create = asyncHandler(async (req, res) => {
   const subject = requireString(req.body.subject, 'subject', { min: 2, max: 80 });
@@ -25,7 +26,9 @@ export const list = asyncHandler(async (req, res) => {
 
 export const getOne = asyncHandler(async (req, res) => {
   const roomId = requireObjectId(req.params.roomId, 'roomId');
-  res.json({ data: { room: roomDto(await getRoom(roomId, req.auth.userId)) } });
+  const room = await getRoom(roomId, req.auth.userId);
+  const mediaStates = room.status === 'active' ? await getRoomMediaStates(roomId) : {};
+  res.json({ data: { room: roomDto(room), mediaStates } });
 });
 
 export const join = asyncHandler(async (req, res) => {
@@ -53,6 +56,14 @@ export const leave = asyncHandler(async (req, res) => {
   }
   await detachUserSocketsFromRoom(req.auth.userId, roomId);
   res.json({ data: { left: result.left, roomClosed: result.roomClosed, leftAt: result.leftAt || null, durationSeconds: result.durationSeconds || 0 } });
+});
+
+export const deleteRoom = asyncHandler(async (req, res) => {
+  const roomId = requireObjectId(req.params.roomId, 'roomId');
+  const result = await deleteRoomService({ roomId, userId: req.auth.userId });
+  publishRoomClosed({ roomId, closedAt: result.closedAt });
+  await Promise.all(result.memberIds.map((memberId) => detachUserSocketsFromRoom(memberId, roomId)));
+  res.json({ data: { deleted: true, roomId: String(roomId) } });
 });
 
 export const messages = asyncHandler(async (req, res) => {
