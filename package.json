@@ -1,0 +1,14 @@
+{
+  "name": "studyloop",
+  "version": "1.0.0",
+  "description": "Find a study buddy who gets your goals",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "vercel build"
+  },
+  "dependencies": {
+    "@vercel/analytics": "^1.3.1"
+  },
+  "devDependencies": {},
+  "private": true
+}
